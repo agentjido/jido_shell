@@ -7,22 +7,20 @@ defmodule Kodo.MixProject do
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
-      preferred_cli_env: [
-        "test.watch": :test
-      ],
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       aliases: aliases()
     ]
   end
 
+  # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :telemetry],
       mod: {Kodo.Application, []}
     ]
   end
@@ -31,7 +29,12 @@ defmodule Kodo.MixProject do
   defp deps do
     [
       {:depot, path: "../depot"},
-      {:splode, "~> 0.2"},
+      {:nimble_parsec, "~> 1.4"},
+      {:phoenix_pubsub, "~> 2.1"},
+      {:gen_stage, "~> 1.2"},
+      {:telemetry, "~> 1.2"},
+      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_poller, "~> 1.0"},
 
       # Development & Test Dependencies
       {:credo, "~> 1.7", only: [:dev, :test]},

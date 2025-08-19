@@ -1,12 +1,11 @@
 defmodule Kodo.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
-
   use Application
 
   @impl true
   def start(_type, _args) do
+    Kodo.Telemetry.attach_default_handlers()
+
     children = [
       # Global registry for instance management
       {Registry, keys: :unique, name: Kodo.InstanceRegistry},
