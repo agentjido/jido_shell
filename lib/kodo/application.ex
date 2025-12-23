@@ -1,18 +1,16 @@
 defmodule Kodo.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
-
   use Application
 
   @impl true
   def start(_type, _args) do
-    children = [
-      # Global registry for instance management
-      {Registry, keys: :unique, name: Kodo.InstanceRegistry},
+    Kodo.VFS.init()
 
-      # Instance manager to handle multiple Kodo environments
-      Kodo.InstanceManager
+    children = [
+      {Registry, keys: :unique, name: Kodo.SessionRegistry},
+      {DynamicSupervisor, strategy: :one_for_one, name: Kodo.SessionSupervisor},
+      {DynamicSupervisor, strategy: :one_for_one, name: Kodo.FilesystemSupervisor},
+      {Task.Supervisor, name: Kodo.CommandTaskSupervisor}
     ]
 
     opts = [strategy: :one_for_one, name: Kodo.Supervisor]

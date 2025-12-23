@@ -1,25 +1,54 @@
 defmodule Kodo.MixProject do
   use Mix.Project
 
+  @version "3.0.0"
+  @source_url "https://github.com/agentjido/kodo"
+  @description "Virtual workspace shell for LLM-human collaboration in the AgentJido ecosystem"
+
   def project do
     [
       app: :kodo,
-      version: "0.1.0",
-      elixir: "~> 1.18",
-      start_permanent: Mix.env() == :prod,
-      preferred_cli_env: [
-        "test.watch": :test
-      ],
+      version: @version,
+      elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
+      start_permanent: Mix.env() == :prod,
       deps: deps(),
-      aliases: aliases()
+      aliases: aliases(),
+
+      # Documentation
+      name: "Kodo",
+      description: @description,
+      source_url: @source_url,
+      homepage_url: @source_url,
+      package: package(),
+      docs: docs(),
+
+      # Test Coverage
+      test_coverage: [
+        tool: ExCoveralls,
+        summary: [threshold: 90]
+      ],
+
+      # Dialyzer
+      dialyzer: [
+        plt_local_path: "priv/plts/project.plt",
+        plt_core_path: "priv/plts/core.plt",
+        flags: [:error_handling, :unknown],
+        ignore_warnings: ".dialyzer_ignore.exs"
+      ]
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.github": :test,
+        "coveralls.html": :test
+      ]
+    ]
+  end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger],
@@ -27,20 +56,24 @@ defmodule Kodo.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
   defp deps do
     [
-      {:depot, path: "../depot"},
-      {:splode, "~> 0.2"},
+      # Runtime dependencies
+      {:jason, "~> 1.4"},
+      {:uniq, "~> 0.6"},
+      {:zoi, "~> 0.14"},
+      {:depot, github: "agentjido/depot"},
 
-      # Development & Test Dependencies
-      {:credo, "~> 1.7", only: [:dev, :test]},
+      # Dev/Test dependencies
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
-      {:expublish, "~> 2.7", only: [:dev], runtime: false},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: [:dev, :test]},
+      {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:mimic, "~> 2.0", only: :test},
       {:stream_data, "~> 1.0", only: [:dev, :test]}
     ]
@@ -48,21 +81,41 @@ defmodule Kodo.MixProject do
 
   defp aliases do
     [
-      # Helper to run tests with trace when needed
-      # test: "test --trace --exclude flaky",
+      setup: ["deps.get", "git_hooks.install"],
       test: "test --exclude flaky",
-
-      # Helper to run docs
-      docs: "docs -f html --open",
-
-      # Run to check the quality of your code
       q: ["quality"],
       quality: [
-        "format",
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "dialyzer --format dialyxir",
-        "credo --all"
+        "credo --min-priority higher",
+        "dialyzer"
+      ]
+    ]
+  end
+
+  defp package do
+    [
+      files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md"],
+      maintainers: ["AgentJido Team"],
+      licenses: ["Apache-2.0"],
+      links: %{
+        "Changelog" => "https://hexdocs.pm/kodo/changelog.html",
+        "Discord" => "https://agentjido.xyz/discord",
+        "Documentation" => "https://hexdocs.pm/kodo",
+        "GitHub" => @source_url,
+        "Website" => "https://agentjido.xyz"
+      }
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      source_ref: "v#{@version}",
+      extras: [
+        "README.md",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md"
       ]
     ]
   end
