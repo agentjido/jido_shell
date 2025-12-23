@@ -65,7 +65,7 @@ defmodule Kodo.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.14"},
-      {:depot, github: "agentjido/depot"},
+      jido_dep(:hako, "../hako", "~> 1.0"),
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -77,6 +77,20 @@ defmodule Kodo.MixProject do
       {:mimic, "~> 2.0", only: :test},
       {:stream_data, "~> 1.0", only: [:dev, :test]}
     ]
+  end
+
+  defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
+    path = Path.expand(rel_path, __DIR__)
+
+    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
+      {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
+    else
+      {app, hex_req, extra_opts}
+    end
+    |> case do
+      {app, opts} when is_list(opts) -> {app, opts}
+      {app, req, opts} -> {app, req, opts}
+    end
   end
 
   defp aliases do

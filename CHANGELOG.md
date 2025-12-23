@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Kodo.SessionServer` - GenServer per session with state and subscriptions
 - `Kodo.Command` behaviour - Unified command interface with streaming support
 - `Kodo.CommandRunner` - Task-based command execution
-- `Kodo.VFS` - Virtual filesystem with Depot adapters and mount table
+- `Kodo.VFS` - Virtual filesystem with Hako adapters and mount table
 - `Kodo.Agent` - Agent-friendly programmatic API
 - `Kodo.Transport.IEx` - Interactive IEx shell transport
 - `Kodo.Transport.TermUI` - Rich terminal UI transport

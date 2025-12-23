@@ -69,7 +69,7 @@ defmodule Kodo.TestShell do
     # Setup VFS
     VFS.init()
     fs_name = :"test_fs_#{System.unique_integer([:positive])}"
-    :ok = VFS.mount(workspace_id, "/", Depot.Adapter.InMemory, name: fs_name)
+    :ok = VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
 
     # Create session
     {:ok, session_id} = Session.start(workspace_id, Keyword.take(opts, [:cwd, :env]))

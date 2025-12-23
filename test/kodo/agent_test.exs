@@ -29,9 +29,9 @@ defmodule Kodo.AgentTest do
     workspace_id = :"agent_test_#{System.unique_integer([:positive])}"
     fs_name = :"agent_fs_#{System.unique_integer([:positive])}"
 
-    start_supervised!({Depot.Adapter.InMemory, {Depot.Adapter.InMemory, %Depot.Adapter.InMemory.Config{name: fs_name}}})
+    start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
 
-    :ok = VFS.mount(workspace_id, "/", Depot.Adapter.InMemory, name: fs_name)
+    :ok = VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
 
     on_exit(fn ->
       VFS.unmount(workspace_id, "/")

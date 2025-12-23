@@ -119,7 +119,7 @@ defmodule Kodo.Session do
   def start_with_vfs(workspace_id, opts \\ []) when is_atom(workspace_id) do
     if Kodo.VFS.list_mounts(workspace_id) == [] do
       fs_name = :"kodo_vfs_#{workspace_id}_#{System.unique_integer([:positive])}"
-      :ok = Kodo.VFS.mount(workspace_id, "/", Depot.Adapter.InMemory, name: fs_name)
+      :ok = Kodo.VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
     end
 
     start(workspace_id, opts)

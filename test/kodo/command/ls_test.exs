@@ -10,8 +10,8 @@ defmodule Kodo.Command.LsTest do
     workspace_id = :"test_ws_#{System.unique_integer([:positive])}"
     fs_name = :"test_fs_#{System.unique_integer([:positive])}"
 
-    start_supervised!({Depot.Adapter.InMemory, {Depot.Adapter.InMemory, %Depot.Adapter.InMemory.Config{name: fs_name}}})
-    :ok = VFS.mount(workspace_id, "/", Depot.Adapter.InMemory, name: fs_name)
+    start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+    :ok = VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
 
     {:ok, state} = State.new(%{id: "test", workspace_id: workspace_id, cwd: "/"})
 

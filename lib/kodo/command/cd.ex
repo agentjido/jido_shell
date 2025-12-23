@@ -34,7 +34,7 @@ defmodule Kodo.Command.Cd do
       end
 
     case Kodo.VFS.stat(state.workspace_id, target) do
-      {:ok, %Depot.Stat.Dir{}} ->
+      {:ok, %Hako.Stat.Dir{}} ->
         {:ok, {:state_update, %{cwd: target}}}
 
       {:ok, _} ->

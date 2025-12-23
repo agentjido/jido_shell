@@ -10,7 +10,7 @@ Kodo provides an Elixir-native virtual shell with an in-memory filesystem, strea
 
 ## Features
 
-- **Virtual Filesystem** - In-memory VFS with [Depot](https://github.com/elixir-depot/depot) adapter support
+- **Virtual Filesystem** - In-memory VFS with [Hako](https://github.com/agentjido/hako) adapter support
 - **Familiar Shell Interface** - Unix-like commands (ls, cd, cat, echo, etc.)
 - **Streaming Output** - Real-time command output via pub/sub events
 - **Session Management** - Multiple isolated sessions per workspace
@@ -152,7 +152,7 @@ end
 ┌─────────────────────────────────────────────────────────────────┐
 │ Kodo.VFS                                                        │
 │  • Router + ETS mount table                                     │
-│  • File operations over Depot adapters                          │
+│  • File operations over Hako adapters                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -202,11 +202,11 @@ When subscribed to a session, you receive these events:
 
 ## Mounting Local Filesystems
 
-Kodo can mount real directories using Depot adapters:
+Kodo can mount real directories using Hako adapters:
 
 ```elixir
 # Mount a local directory
-:ok = Kodo.VFS.mount(:workspace, "/code", Depot.Adapter.Local, prefix: "/path/to/project")
+:ok = Kodo.VFS.mount(:workspace, "/code", Hako.Adapter.Local, prefix: "/path/to/project")
 
 # Start session - now /code maps to the real directory
 {:ok, session} = Kodo.Agent.new(:workspace)

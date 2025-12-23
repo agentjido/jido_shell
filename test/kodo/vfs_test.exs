@@ -8,9 +8,9 @@ defmodule Kodo.VFSTest do
     workspace_id = :"test_ws_#{System.unique_integer([:positive])}"
     fs_name = :"test_fs_#{System.unique_integer([:positive])}"
 
-    start_supervised!({Depot.Adapter.InMemory, {Depot.Adapter.InMemory, %Depot.Adapter.InMemory.Config{name: fs_name}}})
+    start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
 
-    :ok = VFS.mount(workspace_id, "/", Depot.Adapter.InMemory, name: fs_name)
+    :ok = VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
 
     on_exit(fn ->
       VFS.unmount(workspace_id, "/")
@@ -95,7 +95,7 @@ defmodule Kodo.VFSTest do
       {:ok, stat} = VFS.stat(workspace_id, "/statme.txt")
       assert stat.name == "statme.txt"
       assert stat.size == 7
-      assert %Depot.Stat.File{} = stat
+      assert %Hako.Stat.File{} = stat
     end
 
     test "returns stats for a directory", %{workspace_id: workspace_id} do
@@ -103,12 +103,12 @@ defmodule Kodo.VFSTest do
 
       {:ok, stat} = VFS.stat(workspace_id, "/mydir")
       assert stat.name == "mydir"
-      assert %Depot.Stat.Dir{} = stat
+      assert %Hako.Stat.Dir{} = stat
     end
 
     test "returns stats for root", %{workspace_id: workspace_id} do
       {:ok, stat} = VFS.stat(workspace_id, "/")
-      assert %Depot.Stat.Dir{} = stat
+      assert %Hako.Stat.Dir{} = stat
     end
 
     test "returns error for non-existent path", %{workspace_id: workspace_id} do

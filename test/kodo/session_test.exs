@@ -142,10 +142,10 @@ defmodule Kodo.SessionTest do
       fs_name = :"test_fs_#{System.unique_integer([:positive])}"
 
       start_supervised!(
-        {Depot.Adapter.InMemory, {Depot.Adapter.InMemory, %Depot.Adapter.InMemory.Config{name: fs_name}}}
+        {Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}}
       )
 
-      :ok = Kodo.VFS.mount(workspace_id, "/", Depot.Adapter.InMemory, name: fs_name)
+      :ok = Kodo.VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
 
       {:ok, session_id} = Session.start_with_vfs(workspace_id)
 

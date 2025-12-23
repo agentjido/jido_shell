@@ -44,7 +44,7 @@ defmodule Kodo.Command.Ls do
     end
   end
 
-  defp format_entry(%Depot.Stat.Dir{name: name}), do: name <> "/"
+  defp format_entry(%Hako.Stat.Dir{name: name}), do: name <> "/"
   defp format_entry(%{name: name}), do: name
 
   defp resolve_path(cwd, path) do

@@ -8,7 +8,7 @@ defmodule Kodo.VFS.Mount do
   @type t :: %__MODULE__{
           path: String.t(),
           adapter: module(),
-          filesystem: Depot.filesystem(),
+          filesystem: Hako.filesystem(),
           opts: keyword()
         }
 

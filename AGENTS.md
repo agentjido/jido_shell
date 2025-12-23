@@ -39,7 +39,7 @@ Kodo.Supervisor
 ├── DynamicSupervisor (Kodo.SessionSupervisor)
 │   └── SessionServer processes
 ├── DynamicSupervisor (Kodo.FilesystemSupervisor)
-│   └── Depot adapter processes
+│   └── Hako adapter processes
 └── Task.Supervisor (Kodo.CommandTaskSupervisor)
     └── Command task processes
 ```
