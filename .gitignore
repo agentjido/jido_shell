@@ -26,3 +26,14 @@ kodo-*.tar
 /priv/plts/
 *.plt
 *.plt.hash
+
+# Language Servers
+.elixir_ls/
+
+# Environment files
+.env
+
+# Editor/IDE
+.claude/
+.conductor/
+.quibbler/

@@ -25,9 +25,7 @@ defmodule Kodo.VFS.MountTableTest do
 
   describe "mount/4" do
     test "mounts a filesystem at a path", %{workspace_id: workspace_id, fs_name: fs_name} do
-      start_supervised!(
-        {Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}}
-      )
+      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
 
       assert :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
       assert [mount] = MountTable.list(workspace_id)
@@ -57,9 +55,7 @@ defmodule Kodo.VFS.MountTableTest do
 
   describe "unmount/2" do
     test "unmounts an existing mount", %{workspace_id: workspace_id, fs_name: fs_name} do
-      start_supervised!(
-        {Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}}
-      )
+      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
 
       :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
 
@@ -106,9 +102,7 @@ defmodule Kodo.VFS.MountTableTest do
 
   describe "resolve/2" do
     test "resolves path to root mount", %{workspace_id: workspace_id, fs_name: fs_name} do
-      start_supervised!(
-        {Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}}
-      )
+      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
 
       :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
 
@@ -148,9 +142,7 @@ defmodule Kodo.VFS.MountTableTest do
     test "resolves mount point itself", %{workspace_id: workspace_id} do
       fs_name = :"fs_#{System.unique_integer([:positive])}"
 
-      start_supervised!(
-        {Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}}
-      )
+      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
 
       :ok = MountTable.mount(workspace_id, "/data", Hako.Adapter.InMemory, name: fs_name)
 

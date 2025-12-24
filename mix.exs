@@ -15,14 +15,6 @@ defmodule Kodo.MixProject do
       deps: deps(),
       aliases: aliases(),
 
-      # Documentation
-      name: "Kodo",
-      description: @description,
-      source_url: @source_url,
-      homepage_url: @source_url,
-      package: package(),
-      docs: docs(),
-
       # Test Coverage
       test_coverage: [
         tool: ExCoveralls,
@@ -35,7 +27,18 @@ defmodule Kodo.MixProject do
         plt_core_path: "priv/plts/core.plt",
         flags: [:error_handling, :unknown],
         ignore_warnings: ".dialyzer_ignore.exs"
-      ]
+      ],
+
+      # Package
+      package: package(),
+
+      # Documentation
+      name: "Kodo",
+      description: @description,
+      source_url: @source_url,
+      homepage_url: @source_url,
+      source_ref: "v#{@version}",
+      docs: docs()
     ]
   end
 
@@ -95,8 +98,8 @@ defmodule Kodo.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md"],
-      maintainers: ["AgentJido Team"],
+      files: ~w(lib mix.exs LICENSE README.md CHANGELOG.md CONTRIBUTING.md AGENTS.md usage-rules.md .formatter.exs),
+      maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
         "Changelog" => "https://hexdocs.pm/kodo/changelog.html",
@@ -113,9 +116,32 @@ defmodule Kodo.MixProject do
       main: "readme",
       source_ref: "v#{@version}",
       extras: [
-        "README.md",
+        {"README.md", title: "Overview"},
         "CHANGELOG.md",
         "CONTRIBUTING.md"
+      ],
+      groups_for_modules: [
+        Core: [
+          Kodo,
+          Kodo.Agent,
+          Kodo.Session,
+          Kodo.SessionServer,
+          Kodo.Session.State,
+          Kodo.Error
+        ],
+        Commands: ~r/Kodo\.Command.*/,
+        "Virtual Filesystem": [
+          Kodo.VFS,
+          Kodo.VFS.MountTable
+        ],
+        Transports: [
+          Kodo.Transport.IEx,
+          Kodo.Transport.TermUI
+        ],
+        Internals: [
+          Kodo.CommandRunner,
+          Kodo.Application
+        ]
       ]
     ]
   end
