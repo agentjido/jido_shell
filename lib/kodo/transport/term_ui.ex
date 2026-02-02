@@ -1,6 +1,6 @@
 defmodule Kodo.Transport.TermUI do
   @moduledoc """
-  Rich terminal UI transport for Kodo sessions.
+  Rich terminal UI transport for Kodo sessions using the term_ui library.
 
   Provides a full-screen terminal interface with:
   - Header showing session info and cwd
@@ -11,49 +11,39 @@ defmodule Kodo.Transport.TermUI do
 
       iex> Kodo.Transport.TermUI.start(:my_workspace)
 
-  This is a simplified MVU-style implementation that can be
-  enhanced with the term_ui library for more features.
+  Press Ctrl+C or type "exit" to quit.
   """
+
+  use TermUI.Elm
 
   alias Kodo.Session
   alias Kodo.SessionServer
+  alias TermUI.Event
+  alias TermUI.Renderer.Style
 
-  @type model :: %{
-          session_id: String.t(),
-          workspace_id: atom(),
-          cwd: String.t(),
-          output_buffer: [String.t()],
-          input: String.t(),
-          history: [String.t()],
-          history_index: integer(),
-          command_running: boolean(),
-          scroll_offset: integer()
-        }
+  defstruct [
+    :session_id,
+    :workspace_id,
+    :cwd,
+    output_lines: [],
+    input: "",
+    history: [],
+    history_index: 0,
+    command_running: false
+  ]
 
   @doc """
   Starts the TermUI for a workspace.
   """
-  @spec start(atom(), keyword()) :: :ok
+  @spec start(atom(), keyword()) :: :ok | {:error, term()}
   def start(workspace_id, opts \\ []) when is_atom(workspace_id) do
-    {:ok, session_id} = Session.start_with_vfs(workspace_id, opts)
+    case Session.start_with_vfs(workspace_id, opts) do
+      {:ok, session_id} ->
+        run_with_session(session_id, workspace_id)
 
-    :ok = SessionServer.subscribe(session_id, self())
-
-    {:ok, state} = SessionServer.get_state(session_id)
-
-    model = %{
-      session_id: session_id,
-      workspace_id: workspace_id,
-      cwd: state.cwd,
-      output_buffer: [],
-      input: "",
-      history: [],
-      history_index: 0,
-      command_running: false,
-      scroll_offset: 0
-    }
-
-    run(model)
+      {:error, _} = error ->
+        error
+    end
   end
 
   @doc """
@@ -63,306 +53,216 @@ defmodule Kodo.Transport.TermUI do
   def attach(session_id) do
     case Session.lookup(session_id) do
       {:ok, _pid} ->
-        :ok = SessionServer.subscribe(session_id, self())
         {:ok, state} = SessionServer.get_state(session_id)
-
-        model = %{
-          session_id: session_id,
-          workspace_id: state.workspace_id,
-          cwd: state.cwd,
-          output_buffer: [],
-          input: "",
-          history: state.history,
-          history_index: 0,
-          command_running: state.current_command != nil,
-          scroll_offset: 0
-        }
-
-        run(model)
+        run_with_session(session_id, state.workspace_id)
 
       {:error, :not_found} = error ->
         error
     end
   end
 
-  # === MVU Loop ===
+  defp run_with_session(session_id, workspace_id) do
+    # Start runtime (non-blocking) so we can get its PID for event forwarding
+    {:ok, runtime} =
+      TermUI.Runtime.start_link(
+        root: __MODULE__,
+        root_opts: [session_id: session_id, workspace_id: workspace_id]
+      )
 
-  defp run(model) do
-    clear_screen()
-    render(model)
+    # Subscribe to session events in this process
+    :ok = SessionServer.subscribe(session_id, self())
 
-    case wait_for_input() do
-      {:key, :ctrl_c} when model.command_running ->
-        SessionServer.cancel(model.session_id)
-        run(model)
-
-      {:key, :ctrl_c} ->
-        clear_screen()
-        IO.puts("Goodbye!")
-        :ok
-
-      {:key, :ctrl_d} ->
-        clear_screen()
-        IO.puts("Goodbye!")
-        :ok
-
-      {:key, :enter} ->
-        model = handle_enter(model)
-        run(model)
-
-      {:key, :backspace} ->
-        model = %{model | input: String.slice(model.input, 0..-2//1)}
-        run(model)
-
-      {:key, :up} ->
-        model = history_up(model)
-        run(model)
-
-      {:key, :down} ->
-        model = history_down(model)
-        run(model)
-
-      {:key, {:char, c}} ->
-        model = %{model | input: model.input <> <<c>>}
-        run(model)
-
-      {:session_event, event} ->
-        model = handle_session_event(model, event)
-        run(model)
-
-      :timeout ->
-        run(model)
-
-      _ ->
-        run(model)
-    end
-  catch
-    :exit -> :ok
+    # Monitor runtime and forward events until it exits
+    ref = Process.monitor(runtime)
+    forward_events_loop(runtime, session_id, ref)
   end
 
-  # === Input Handling ===
-
-  defp wait_for_input do
+  defp forward_events_loop(runtime, session_id, ref) do
     receive do
-      {:kodo_session, _session_id, event} ->
-        {:session_event, event}
+      {:kodo_session, ^session_id, event} ->
+        # Use send_message to deliver directly to the :root component
+        TermUI.Runtime.send_message(runtime, :root, {:session, event})
+        forward_events_loop(runtime, session_id, ref)
+
+      {:DOWN, ^ref, :process, ^runtime, _reason} ->
+        :ok
     after
-      100 ->
-        case IO.getn("", 1) do
-          "\e" ->
-            read_escape_sequence()
-
-          "\r" ->
-            {:key, :enter}
-
-          "\n" ->
-            {:key, :enter}
-
-          <<127>> ->
-            {:key, :backspace}
-
-          <<3>> ->
-            {:key, :ctrl_c}
-
-          <<4>> ->
-            {:key, :ctrl_d}
-
-          c when is_binary(c) and byte_size(c) == 1 ->
-            <<char>> = c
-            {:key, {:char, char}}
-
-          _ ->
-            :timeout
-        end
+      60_000 ->
+        forward_events_loop(runtime, session_id, ref)
     end
   end
 
-  defp read_escape_sequence do
-    case IO.getn("", 1) do
-      "[" ->
-        case IO.getn("", 1) do
-          "A" -> {:key, :up}
-          "B" -> {:key, :down}
-          "C" -> {:key, :right}
-          "D" -> {:key, :left}
-          _ -> {:key, :escape}
-        end
+  # === Elm Architecture Callbacks ===
 
-      _ ->
-        {:key, :escape}
-    end
+  @impl true
+  def init(opts) do
+    # TermUI passes the full opts, root_opts contains our session info
+    root_opts = Keyword.get(opts, :root_opts, opts)
+    session_id = Keyword.fetch!(root_opts, :session_id)
+    workspace_id = Keyword.fetch!(root_opts, :workspace_id)
+
+    {:ok, session_state} = SessionServer.get_state(session_id)
+
+    %__MODULE__{
+      session_id: session_id,
+      workspace_id: workspace_id,
+      cwd: session_state.cwd,
+      history: session_state.history
+    }
   end
 
-  defp handle_enter(%{input: ""} = model), do: model
+  @impl true
+  def event_to_msg(%Event.Key{key: "c", modifiers: [:ctrl]}, %{command_running: true}), do: {:msg, :cancel}
+  def event_to_msg(%Event.Key{key: "c", modifiers: [:ctrl]}, _state), do: {:msg, :quit}
+  def event_to_msg(%Event.Key{key: "d", modifiers: [:ctrl]}, _state), do: {:msg, :quit}
+  def event_to_msg(%Event.Key{key: :enter}, _state), do: {:msg, :submit}
+  def event_to_msg(%Event.Key{key: :backspace}, _state), do: {:msg, :backspace}
+  def event_to_msg(%Event.Key{key: :up}, _state), do: {:msg, :history_up}
+  def event_to_msg(%Event.Key{key: :down}, _state), do: {:msg, :history_down}
+  def event_to_msg(%Event.Key{key: char}, _state) when is_binary(char), do: {:msg, {:char, char}}
+  # Note: Session events come via send_message, not events
+  def event_to_msg(_, _), do: :ignore
 
-  defp handle_enter(%{input: "exit"}) do
-    clear_screen()
-    IO.puts("Goodbye!")
-    throw(:exit)
+  @impl true
+  def update(:quit, state), do: {state, [:quit]}
+
+  def update(:cancel, state) do
+    SessionServer.cancel(state.session_id)
+    {state, []}
   end
 
-  defp handle_enter(%{input: "quit"}) do
-    clear_screen()
-    IO.puts("Goodbye!")
-    throw(:exit)
-  end
+  def update(:submit, %{input: ""} = state), do: {state, []}
 
-  defp handle_enter(model) do
-    :ok = SessionServer.run_command(model.session_id, model.input)
+  def update(:submit, %{input: "exit"} = state), do: {state, [:quit]}
+  def update(:submit, %{input: "quit"} = state), do: {state, [:quit]}
 
-    %{
-      model
-      | history: [model.input | model.history],
+  def update(:submit, state) do
+    :ok = SessionServer.run_command(state.session_id, state.input)
+
+    new_state = %{
+      state
+      | history: [state.input | state.history],
         history_index: 0,
         input: "",
         command_running: true
     }
+
+    {new_state, []}
   end
 
-  defp history_up(%{history: []} = model), do: model
-
-  defp history_up(%{history: history, history_index: idx} = model) do
-    new_idx = min(idx + 1, length(history))
-    input = Enum.at(history, new_idx - 1) || model.input
-    %{model | history_index: new_idx, input: input}
+  def update(:backspace, state) do
+    {%{state | input: String.slice(state.input, 0..-2//1)}, []}
   end
 
-  defp history_down(%{history_index: 0} = model), do: model
+  def update(:history_up, %{history: []} = state), do: {state, []}
 
-  defp history_down(%{history: history, history_index: idx} = model) do
-    new_idx = max(idx - 1, 0)
-    input = if new_idx == 0, do: "", else: Enum.at(history, new_idx - 1) || ""
-    %{model | history_index: new_idx, input: input}
+  def update(:history_up, state) do
+    new_idx = min(state.history_index + 1, length(state.history))
+    input = Enum.at(state.history, new_idx - 1) || state.input
+    {%{state | history_index: new_idx, input: input}, []}
   end
 
-  # === Session Events ===
+  def update(:history_down, %{history_index: 0} = state), do: {state, []}
 
-  defp handle_session_event(model, {:command_started, _line}) do
-    model
+  def update(:history_down, state) do
+    new_idx = max(state.history_index - 1, 0)
+    input = if new_idx == 0, do: "", else: Enum.at(state.history, new_idx - 1) || ""
+    {%{state | history_index: new_idx, input: input}, []}
   end
 
-  defp handle_session_event(model, {:output, chunk}) do
-    %{model | output_buffer: model.output_buffer ++ [chunk]}
+  def update({:char, char}, state) do
+    {%{state | input: state.input <> char}, []}
   end
 
-  defp handle_session_event(model, {:error, error}) do
-    error_line = "\e[31mError: #{error.message}\e[0m\n"
-
-    %{
-      model
-      | output_buffer: model.output_buffer ++ [error_line],
-        command_running: false
-    }
+  def update({:session, event}, state) do
+    {handle_session_event(state, event), []}
   end
 
-  defp handle_session_event(model, {:cwd_changed, cwd}) do
-    %{model | cwd: cwd}
+  # === Session Event Handlers ===
+
+  defp handle_session_event(state, {:command_started, _line}), do: state
+
+  defp handle_session_event(state, {:output, chunk}) do
+    # Strip ANSI escape sequences since TermUI handles styling separately
+    clean_chunk = strip_ansi(chunk)
+    new_lines = String.split(clean_chunk, "\n", trim: false)
+    %{state | output_lines: state.output_lines ++ new_lines}
   end
 
-  defp handle_session_event(model, :command_done) do
-    %{model | command_running: false}
+  defp handle_session_event(state, {:error, error}) do
+    %{state | output_lines: state.output_lines ++ ["Error: #{error.message}"], command_running: false}
   end
 
-  defp handle_session_event(model, :command_cancelled) do
-    %{
-      model
-      | output_buffer: model.output_buffer ++ ["\e[33mCancelled\e[0m\n"],
-        command_running: false
-    }
+  defp handle_session_event(state, {:cwd_changed, cwd}) do
+    %{state | cwd: cwd}
   end
 
-  defp handle_session_event(model, {:command_crashed, reason}) do
-    error_line = "\e[31mCrashed: #{inspect(reason)}\e[0m\n"
-
-    %{
-      model
-      | output_buffer: model.output_buffer ++ [error_line],
-        command_running: false
-    }
+  defp handle_session_event(state, :command_done) do
+    %{state | command_running: false}
   end
 
-  defp handle_session_event(model, _event), do: model
-
-  # === Rendering ===
-
-  defp clear_screen do
-    IO.write("\e[2J\e[H")
+  defp handle_session_event(state, :command_cancelled) do
+    %{state | output_lines: state.output_lines ++ ["Cancelled"], command_running: false}
   end
 
-  defp render(model) do
-    {width, height} = get_terminal_size()
-
-    header = render_header(model, width)
-
-    output_height = height - 4
-
-    output = render_output(model, width, output_height)
-
-    status = render_status(model, width)
-
-    input_line = render_input(model)
-
-    IO.write("\e[H")
-    IO.write(header)
-    IO.write(output)
-    IO.write(status)
-    IO.write(input_line)
-
-    cursor_col = String.length(model.cwd) + String.length(model.input) + 3
-    IO.write("\e[#{height};#{cursor_col}H")
+  defp handle_session_event(state, {:command_crashed, reason}) do
+    %{state | output_lines: state.output_lines ++ ["Crashed: #{inspect(reason)}"], command_running: false}
   end
 
-  defp render_header(model, width) do
-    title = "Kodo Shell - #{model.workspace_id}"
-    cwd_line = "cwd: #{model.cwd}"
+  defp handle_session_event(state, _event), do: state
 
-    "\e[7m" <>
-      String.pad_trailing(title, width) <>
-      "\e[0m\n" <>
-      "\e[36m#{cwd_line}\e[0m\n"
+  # === View ===
+
+  @impl true
+  def view(state) do
+    stack(:vertical, [
+      render_header(state),
+      render_output(state),
+      render_status(state),
+      render_input(state)
+    ])
   end
 
-  defp render_output(model, _width, height) do
-    all_output = Enum.join(model.output_buffer)
-    lines = String.split(all_output, "\n", trim: false)
-
-    visible_lines = Enum.take(lines, -height)
-
-    padding = height - length(visible_lines)
-    padded = List.duplicate("\n", padding) ++ Enum.map(visible_lines, &(&1 <> "\n"))
-
-    Enum.join(padded)
+  defp render_header(state) do
+    stack(:vertical, [
+      text("Kodo Shell - #{state.workspace_id}", Style.new(fg: :white, bg: :blue, attrs: [:bold])),
+      text("cwd: #{state.cwd}", Style.new(fg: :cyan))
+    ])
   end
 
-  defp render_status(model, width) do
-    status =
-      if model.command_running do
-        "\e[33m[Running...]\e[0m"
-      else
-        "\e[32m[Ready]\e[0m"
-      end
+  defp render_output(state) do
+    lines =
+      state.output_lines
+      |> Enum.take(-20)
+      |> Enum.map(&text(&1, nil))
 
-    String.pad_trailing(status, width) <> "\n"
-  end
-
-  defp render_input(model) do
-    prompt = "\e[36m#{model.cwd}\e[0m> "
-    prompt <> model.input
-  end
-
-  defp get_terminal_size do
-    case :io.columns() do
-      {:ok, cols} ->
-        rows =
-          case :io.rows() do
-            {:ok, r} -> r
-            _ -> 24
-          end
-
-        {cols, rows}
-
-      _ ->
-        {80, 24}
+    if Enum.empty?(lines) do
+      text("", nil)
+    else
+      stack(:vertical, lines)
     end
+  end
+
+  defp render_status(state) do
+    if state.command_running do
+      text("[Running...]", Style.new(fg: :yellow))
+    else
+      text("[Ready]", Style.new(fg: :green))
+    end
+  end
+
+  defp render_input(state) do
+    prompt = "#{state.cwd}> "
+    text(prompt <> state.input, Style.new(fg: :cyan))
+  end
+
+  # === Helpers ===
+
+  # Strip ANSI escape sequences from output
+  defp strip_ansi(text) do
+    # Match CSI sequences (ESC[...m and similar) and OSC sequences
+    text
+    |> String.replace(~r/\e\[[0-9;]*[a-zA-Z]/, "")
+    |> String.replace(~r/\e\][^\a]*\a/, "")
   end
 end

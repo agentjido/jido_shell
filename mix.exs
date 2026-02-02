@@ -69,6 +69,7 @@ defmodule Kodo.MixProject do
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.14"},
       {:hako, github: "agentjido/hako"},
+      {:term_ui, "~> 0.2.0"},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
