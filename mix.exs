@@ -25,8 +25,8 @@ defmodule Kodo.MixProject do
       dialyzer: [
         plt_local_path: "priv/plts/project.plt",
         plt_core_path: "priv/plts/core.plt",
-        flags: [:error_handling, :unknown],
-        ignore_warnings: ".dialyzer_ignore.exs"
+        plt_add_apps: [:mix],
+        flags: [:error_handling, :unknown]
       ],
 
       # Package
@@ -69,6 +69,7 @@ defmodule Kodo.MixProject do
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.14"},
       {:hako, github: "agentjido/hako"},
+      {:term_ui, "~> 0.2.0"},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
