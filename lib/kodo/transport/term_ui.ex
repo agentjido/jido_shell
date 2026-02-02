@@ -21,6 +21,9 @@ defmodule Kodo.Transport.TermUI do
   alias TermUI.Event
   alias TermUI.Renderer.Style
 
+  # This function intentionally blocks in forward_events_loop until runtime exits
+  @dialyzer {:nowarn_function, run_with_session: 2}
+
   defstruct [
     :session_id,
     :workspace_id,
