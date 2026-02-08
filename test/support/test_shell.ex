@@ -1,9 +1,9 @@
-defmodule Kodo.TestShell do
+defmodule Jido.Shell.TestShell do
   @moduledoc """
   Test helper for E2E shell testing.
 
   Provides a synchronous, deterministic interface for testing
-  Kodo shell workflows with proper isolation and cleanup.
+  Jido.Shell workflows with proper isolation and cleanup.
 
   ## Usage
 
@@ -39,10 +39,10 @@ defmodule Kodo.TestShell do
       end
   """
 
-  alias Kodo.Agent
-  alias Kodo.Session
-  alias Kodo.SessionServer
-  alias Kodo.VFS
+  alias Jido.Shell.Agent
+  alias Jido.Shell.Session
+  alias Jido.Shell.SessionServer
+  alias Jido.Shell.VFS
 
   defstruct [:session_id, :workspace_id, :owner]
 
@@ -99,10 +99,10 @@ defmodule Kodo.TestShell do
 
     case Agent.run(session_id, command, timeout: timeout) do
       {:ok, output} -> {:ok, String.trim(output)}
-      {:error, %Kodo.Error{code: {:shell, :busy}}} -> {:error, :busy}
-      {:error, %Kodo.Error{code: {:shell, :unknown_command}}} -> {:error, :unknown_command}
-      {:error, %Kodo.Error{code: {:shell, :empty_command}}} -> {:error, :empty_command}
-      {:error, %Kodo.Error{} = error} -> {:error, error}
+      {:error, %Jido.Shell.Error{code: {:shell, :busy}}} -> {:error, :busy}
+      {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}} -> {:error, :unknown_command}
+      {:error, %Jido.Shell.Error{code: {:shell, :empty_command}}} -> {:error, :empty_command}
+      {:error, %Jido.Shell.Error{} = error} -> {:error, error}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -197,7 +197,7 @@ defmodule Kodo.TestShell do
   @doc """
   Gets the session state.
   """
-  @spec state(t()) :: Kodo.Session.State.t()
+  @spec state(t()) :: Jido.Shell.Session.State.t()
   def state(%__MODULE__{session_id: session_id}) do
     {:ok, state} = SessionServer.get_state(session_id)
     state
@@ -251,10 +251,10 @@ defmodule Kodo.TestShell do
   @spec await_event(t(), atom() | tuple(), timeout()) :: {:ok, term()} | {:error, :timeout}
   def await_event(%__MODULE__{session_id: session_id}, event_match, timeout \\ @default_timeout) do
     receive do
-      {:kodo_session, ^session_id, event} when event == event_match ->
+      {:jido_shell_session, ^session_id, event} when event == event_match ->
         {:ok, event}
 
-      {:kodo_session, ^session_id, event} ->
+      {:jido_shell_session, ^session_id, event} ->
         case match_event?(event, event_match) do
           true -> {:ok, event}
           false -> await_event(%__MODULE__{session_id: session_id}, event_match, timeout)
@@ -276,16 +276,16 @@ defmodule Kodo.TestShell do
 
   defp do_collect_events(session_id, acc, timeout) do
     receive do
-      {:kodo_session, ^session_id, :command_done} ->
+      {:jido_shell_session, ^session_id, :command_done} ->
         Enum.reverse([:command_done | acc])
 
-      {:kodo_session, ^session_id, :command_cancelled} ->
+      {:jido_shell_session, ^session_id, :command_cancelled} ->
         Enum.reverse([:command_cancelled | acc])
 
-      {:kodo_session, ^session_id, {:command_crashed, _} = event} ->
+      {:jido_shell_session, ^session_id, {:command_crashed, _} = event} ->
         Enum.reverse([event | acc])
 
-      {:kodo_session, ^session_id, event} ->
+      {:jido_shell_session, ^session_id, event} ->
         do_collect_events(session_id, [event | acc], timeout)
     after
       timeout -> Enum.reverse(acc)

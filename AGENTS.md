@@ -1,8 +1,8 @@
-# Agent Guide for Kodo
+# Agent Guide for Jido.Shell
 
 ## Purpose
 
-Kodo is an Elixir-native virtual shell system that provides multi-instance interactive sessions with virtual file system support. It's designed to be embedded in any BEAM application, offering an interactive REPL and full programmatic API for spawning sessions, evaluating commands, and manipulating virtual file systems.
+Jido.Shell is an Elixir-native virtual shell system that provides multi-instance interactive sessions with virtual file system support. It's designed to be embedded in any BEAM application, offering an interactive REPL and full programmatic API for spawning sessions, evaluating commands, and manipulating virtual file systems.
 
 ## Commands
 
@@ -34,13 +34,13 @@ mix kodo --ui          # Rich terminal UI
 ### Supervision Tree
 
 ```
-Kodo.Supervisor
-├── Registry (Kodo.SessionRegistry)
-├── DynamicSupervisor (Kodo.SessionSupervisor)
+Jido.Shell.Supervisor
+├── Registry (Jido.Shell.SessionRegistry)
+├── DynamicSupervisor (Jido.Shell.SessionSupervisor)
 │   └── SessionServer processes
-├── DynamicSupervisor (Kodo.FilesystemSupervisor)
+├── DynamicSupervisor (Jido.Shell.FilesystemSupervisor)
 │   └── Hako adapter processes
-└── Task.Supervisor (Kodo.CommandTaskSupervisor)
+└── Task.Supervisor (Jido.Shell.CommandTaskSupervisor)
     └── Command task processes
 ```
 
@@ -48,24 +48,24 @@ Kodo.Supervisor
 
 | Module | Purpose |
 |--------|---------|
-| `Kodo.Agent` | Programmatic API for agents (synchronous) |
-| `Kodo.Session` | Session lifecycle management |
-| `Kodo.SessionServer` | Per-session GenServer with state and subscriptions |
-| `Kodo.Command` | Command behaviour definition |
-| `Kodo.Command.Registry` | Command lookup and registration |
-| `Kodo.CommandRunner` | Task-based command execution |
-| `Kodo.VFS` | Virtual filesystem router |
-| `Kodo.VFS.MountTable` | ETS-backed mount table |
-| `Kodo.Transport.IEx` | Interactive IEx transport |
-| `Kodo.Transport.TermUI` | Rich terminal UI transport |
+| `Jido.Shell.Agent` | Programmatic API for agents (synchronous) |
+| `Jido.Shell.Session` | Session lifecycle management |
+| `Jido.Shell.SessionServer` | Per-session GenServer with state and subscriptions |
+| `Jido.Shell.Command` | Command behaviour definition |
+| `Jido.Shell.Command.Registry` | Command lookup and registration |
+| `Jido.Shell.CommandRunner` | Task-based command execution |
+| `Jido.Shell.VFS` | Virtual filesystem router |
+| `Jido.Shell.VFS.MountTable` | ETS-backed mount table |
+| `Jido.Shell.Transport.IEx` | Interactive IEx transport |
+| `Jido.Shell.Transport.TermUI` | Rich terminal UI transport |
 
 ### Command Pattern
 
-Commands implement `Kodo.Command` behaviour:
+Commands implement `Jido.Shell.Command` behaviour:
 
 ```elixir
-defmodule Kodo.Command.Example do
-  @behaviour Kodo.Command
+defmodule Jido.Shell.Command.Example do
+  @behaviour Jido.Shell.Command
 
   @impl true
   def name, do: "example"
@@ -96,7 +96,7 @@ end
 # Events:
 {:command_started, line}
 {:output, chunk}
-{:error, %Kodo.Error{}}
+{:error, %Jido.Shell.Error{}}
 {:cwd_changed, path}
 :command_done
 :command_cancelled
@@ -110,15 +110,15 @@ end
 - Pattern match with `{:ok, result}` | `{:error, reason}`
 - Add `@spec` type annotations for public functions
 - Test with ExUnit in `describe` blocks
-- Use `Kodo.Error` for structured errors
+- Use `Jido.Shell.Error` for structured errors
 - Follow conventional commits for git messages
 
 ## Testing
 
 ```elixir
-# Use Kodo.TestShell for E2E tests
-shell = Kodo.TestShell.start!()
-assert {:ok, "/"} = Kodo.TestShell.run(shell, "pwd")
+# Use Jido.Shell.TestShell for E2E tests
+shell = Jido.Shell.TestShell.start!()
+assert {:ok, "/"} = Jido.Shell.TestShell.run(shell, "pwd")
 ```
 
 ## File Structure

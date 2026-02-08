@@ -1,6 +1,6 @@
-# Contributing to Kodo
+# Contributing to Jido.Shell
 
-Thank you for your interest in contributing to Kodo! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Jido.Shell! This document provides guidelines and instructions for contributing.
 
 ## Development Setup
 
@@ -122,11 +122,11 @@ git commit -m "feat!: breaking change to session API"
 
 To add a new command:
 
-1. Create a module implementing `Kodo.Command` behaviour:
+1. Create a module implementing `Jido.Shell.Command` behaviour:
 
 ```elixir
-defmodule Kodo.Command.MyCommand do
-  @behaviour Kodo.Command
+defmodule Jido.Shell.Command.MyCommand do
+  @behaviour Jido.Shell.Command
 
   @impl true
   def name, do: "mycommand"
@@ -150,7 +150,7 @@ defmodule Kodo.Command.MyCommand do
 end
 ```
 
-2. Register it in `Kodo.Command.Registry`
+2. Register it in `Jido.Shell.Command.Registry`
 
 3. Add tests in `test/kodo/command/my_command_test.exs`
 
@@ -161,7 +161,7 @@ end
 When reporting issues, please include:
 
 - Elixir and OTP versions (`elixir --version`)
-- Kodo version
+- Jido.Shell version
 - Steps to reproduce
 - Expected vs actual behavior
 - Any error messages or stack traces

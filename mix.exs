@@ -1,13 +1,13 @@
-defmodule Kodo.MixProject do
+defmodule Jido.Shell.MixProject do
   use Mix.Project
 
   @version "3.0.0"
-  @source_url "https://github.com/agentjido/kodo"
+  @source_url "https://github.com/agentjido/jido_shell"
   @description "Virtual workspace shell for LLM-human collaboration in the AgentJido ecosystem"
 
   def project do
     [
-      app: :kodo,
+      app: :jido_shell,
       version: @version,
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -33,7 +33,7 @@ defmodule Kodo.MixProject do
       package: package(),
 
       # Documentation
-      name: "Kodo",
+      name: "Jido.Shell",
       description: @description,
       source_url: @source_url,
       homepage_url: @source_url,
@@ -55,7 +55,7 @@ defmodule Kodo.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Kodo.Application, []}
+      mod: {Jido.Shell.Application, []}
     ]
   end
 
@@ -102,9 +102,9 @@ defmodule Kodo.MixProject do
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/kodo/changelog.html",
+        "Changelog" => "https://hexdocs.pm/jido_shell/changelog.html",
         "Discord" => "https://agentjido.xyz/discord",
-        "Documentation" => "https://hexdocs.pm/kodo",
+        "Documentation" => "https://hexdocs.pm/jido_shell",
         "GitHub" => @source_url,
         "Website" => "https://agentjido.xyz"
       }
@@ -122,25 +122,25 @@ defmodule Kodo.MixProject do
       ],
       groups_for_modules: [
         Core: [
-          Kodo,
-          Kodo.Agent,
-          Kodo.Session,
-          Kodo.SessionServer,
-          Kodo.Session.State,
-          Kodo.Error
+          Jido.Shell,
+          Jido.Shell.Agent,
+          Jido.Shell.Session,
+          Jido.Shell.SessionServer,
+          Jido.Shell.Session.State,
+          Jido.Shell.Error
         ],
-        Commands: ~r/Kodo\.Command.*/,
+        Commands: ~r/Jido\.Shell\.Command.*/,
         "Virtual Filesystem": [
-          Kodo.VFS,
-          Kodo.VFS.MountTable
+          Jido.Shell.VFS,
+          Jido.Shell.VFS.MountTable
         ],
         Transports: [
-          Kodo.Transport.IEx,
-          Kodo.Transport.TermUI
+          Jido.Shell.Transport.IEx,
+          Jido.Shell.Transport.TermUI
         ],
         Internals: [
-          Kodo.CommandRunner,
-          Kodo.Application
+          Jido.Shell.CommandRunner,
+          Jido.Shell.Application
         ]
       ]
     ]
