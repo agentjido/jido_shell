@@ -1,6 +1,6 @@
-defmodule Kodo.Case do
+defmodule Jido.Shell.Case do
   @moduledoc """
-  Test case template for Kodo tests.
+  Test case template for Jido.Shell tests.
 
   Provides isolated test environments with common setup.
   """
@@ -9,7 +9,7 @@ defmodule Kodo.Case do
 
   using do
     quote do
-      import Kodo.Case
+      import Jido.Shell.Case
     end
   end
 

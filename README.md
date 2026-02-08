@@ -1,4 +1,4 @@
-# Kodo
+# Jido.Shell
 
 [![Hex.pm](https://img.shields.io/hexpm/v/kodo.svg)](https://hex.pm/packages/kodo)
 [![Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/kodo)
@@ -6,7 +6,7 @@
 
 Virtual workspace shell for LLM-human collaboration in the AgentJido ecosystem.
 
-Kodo provides an Elixir-native virtual shell with an in-memory filesystem, streaming output, and both interactive and programmatic interfaces. It's designed for AI agents that need to manipulate files and run commands in isolated, sandboxed environments.
+Jido.Shell provides an Elixir-native virtual shell with an in-memory filesystem, streaming output, and both interactive and programmatic interfaces. It's designed for AI agents that need to manipulate files and run commands in isolated, sandboxed environments.
 
 ## Features
 
@@ -45,30 +45,30 @@ mix kodo --ui
 
 ```elixir
 # Create a new session with in-memory VFS
-{:ok, session} = Kodo.Agent.new(:my_workspace)
+{:ok, session} = Jido.Shell.Agent.new(:my_workspace)
 
 # Run commands synchronously
-{:ok, output} = Kodo.Agent.run(session, "echo Hello World")
+{:ok, output} = Jido.Shell.Agent.run(session, "echo Hello World")
 # => {:ok, "Hello World\n"}
 
-{:ok, output} = Kodo.Agent.run(session, "pwd")
+{:ok, output} = Jido.Shell.Agent.run(session, "pwd")
 # => {:ok, "/\n"}
 
 # File operations
-:ok = Kodo.Agent.write_file(session, "/hello.txt", "Hello from Kodo!")
-{:ok, content} = Kodo.Agent.read_file(session, "/hello.txt")
-# => {:ok, "Hello from Kodo!"}
+:ok = Jido.Shell.Agent.write_file(session, "/hello.txt", "Hello from Jido.Shell!")
+{:ok, content} = Jido.Shell.Agent.read_file(session, "/hello.txt")
+# => {:ok, "Hello from Jido.Shell!"}
 
 # Directory operations
-{:ok, _} = Kodo.Agent.run(session, "mkdir /projects")
-{:ok, _} = Kodo.Agent.run(session, "cd /projects")
-{:ok, entries} = Kodo.Agent.list_dir(session, "/")
+{:ok, _} = Jido.Shell.Agent.run(session, "mkdir /projects")
+{:ok, _} = Jido.Shell.Agent.run(session, "cd /projects")
+{:ok, entries} = Jido.Shell.Agent.list_dir(session, "/")
 
 # Run multiple commands
-results = Kodo.Agent.run_all(session, ["mkdir /docs", "cd /docs", "pwd"])
+results = Jido.Shell.Agent.run_all(session, ["mkdir /docs", "cd /docs", "pwd"])
 
 # Clean up
-:ok = Kodo.Agent.stop(session)
+:ok = Jido.Shell.Agent.stop(session)
 ```
 
 ### Low-Level Session API
@@ -77,13 +77,13 @@ For more control over session events:
 
 ```elixir
 # Start a session with VFS
-{:ok, session_id} = Kodo.Session.start_with_vfs(:my_workspace)
+{:ok, session_id} = Jido.Shell.Session.start_with_vfs(:my_workspace)
 
 # Subscribe to events
-:ok = Kodo.SessionServer.subscribe(session_id, self())
+:ok = Jido.Shell.SessionServer.subscribe(session_id, self())
 
 # Run commands (async, streams events)
-:ok = Kodo.SessionServer.run_command(session_id, "ls -la")
+:ok = Jido.Shell.SessionServer.run_command(session_id, "ls -la")
 
 # Receive events
 receive do
@@ -92,10 +92,10 @@ receive do
 end
 
 # Cancel running command
-:ok = Kodo.SessionServer.cancel(session_id)
+:ok = Jido.Shell.SessionServer.cancel(session_id)
 
 # Stop session
-:ok = Kodo.Session.stop(session_id)
+:ok = Jido.Shell.Session.stop(session_id)
 ```
 
 ## Available Commands
@@ -121,14 +121,14 @@ end
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Transports                                                      │
-│  • Kodo.Transport.IEx (interactive shell in IEx)                │
-│  • Kodo.Transport.TermUI (rich terminal UI)                     │
-│  • Kodo.Agent (programmatic API for agents)                     │
+│  • Jido.Shell.Transport.IEx (interactive shell in IEx)                │
+│  • Jido.Shell.Transport.TermUI (rich terminal UI)                     │
+│  • Jido.Shell.Agent (programmatic API for agents)                     │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ subscribe / run_command
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Kodo.SessionServer (GenServer per session)                      │
+│ Jido.Shell.SessionServer (GenServer per session)                      │
 │  • Holds session state (cwd, env, history)                      │
 │  • Manages transport subscriptions                              │
 │  • Spawns command tasks, broadcasts output                      │
@@ -136,21 +136,21 @@ end
                            │ spawn Task under CommandTaskSupervisor
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Kodo.CommandRunner (Task process)                               │
+│ Jido.Shell.CommandRunner (Task process)                               │
 │  • Executes command logic                                       │
 │  • Streams output back to session                               │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ calls
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Kodo.Command modules (@behaviour Kodo.Command)                  │
+│ Jido.Shell.Command modules (@behaviour Jido.Shell.Command)                  │
 │  • name/0, summary/0, schema/0                                  │
 │  • run/3 (state, args, emit)                                    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Kodo.VFS                                                        │
+│ Jido.Shell.VFS                                                        │
 │  • Router + ETS mount table                                     │
 │  • File operations over Hako adapters                           │
 └─────────────────────────────────────────────────────────────────┘
@@ -158,11 +158,11 @@ end
 
 ## Creating Custom Commands
 
-Implement the `Kodo.Command` behaviour:
+Implement the `Jido.Shell.Command` behaviour:
 
 ```elixir
 defmodule MyApp.Command.Greet do
-  @behaviour Kodo.Command
+  @behaviour Jido.Shell.Command
 
   @impl true
   def name, do: "greet"
@@ -194,7 +194,7 @@ When subscribed to a session, you receive these events:
 |-------|-------------|
 | `{:command_started, line}` | Command execution began |
 | `{:output, chunk}` | Streaming output chunk |
-| `{:error, Kodo.Error.t()}` | Error occurred |
+| `{:error, Jido.Shell.Error.t()}` | Error occurred |
 | `{:cwd_changed, path}` | Working directory changed |
 | `:command_done` | Command completed successfully |
 | `:command_cancelled` | Command was cancelled |
@@ -202,15 +202,15 @@ When subscribed to a session, you receive these events:
 
 ## Mounting Local Filesystems
 
-Kodo can mount real directories using Hako adapters:
+Jido.Shell can mount real directories using Hako adapters:
 
 ```elixir
 # Mount a local directory
-:ok = Kodo.VFS.mount(:workspace, "/code", Hako.Adapter.Local, prefix: "/path/to/project")
+:ok = Jido.Shell.VFS.mount(:workspace, "/code", Hako.Adapter.Local, prefix: "/path/to/project")
 
 # Start session - now /code maps to the real directory
-{:ok, session} = Kodo.Agent.new(:workspace)
-{:ok, output} = Kodo.Agent.run(session, "ls /code")
+{:ok, session} = Jido.Shell.Agent.new(:workspace)
+{:ok, output} = Jido.Shell.Agent.run(session, "ls /code")
 ```
 
 ## Contributing
