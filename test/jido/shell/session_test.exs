@@ -141,9 +141,11 @@ defmodule Jido.Shell.SessionTest do
       workspace_id = :"test_ws_vfs_exists_#{System.unique_integer([:positive])}"
       fs_name = :"test_fs_#{System.unique_integer([:positive])}"
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+      )
 
-      :ok = Jido.Shell.VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+      :ok = Jido.Shell.VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
       {:ok, session_id} = Session.start_with_vfs(workspace_id)
 

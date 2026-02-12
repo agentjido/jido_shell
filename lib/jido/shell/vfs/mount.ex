@@ -8,7 +8,7 @@ defmodule Jido.Shell.VFS.Mount do
   @type t :: %__MODULE__{
           path: String.t(),
           adapter: module(),
-          filesystem: Hako.filesystem(),
+          filesystem: Jido.VFS.filesystem(),
           opts: keyword()
         }
 

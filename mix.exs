@@ -68,7 +68,7 @@ defmodule Jido.Shell.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.14"},
-      {:hako, github: "agentjido/hako"},
+      {:jido_vfs, github: "agentjido/hako"},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

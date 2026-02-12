@@ -119,7 +119,7 @@ defmodule Jido.Shell.Session do
   def start_with_vfs(workspace_id, opts \\ []) when is_atom(workspace_id) do
     if Jido.Shell.VFS.list_mounts(workspace_id) == [] do
       fs_name = :"kodo_vfs_#{workspace_id}_#{System.unique_integer([:positive])}"
-      :ok = Jido.Shell.VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+      :ok = Jido.Shell.VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
     end
 
     start(workspace_id, opts)
