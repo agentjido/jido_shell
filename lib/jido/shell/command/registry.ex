@@ -37,6 +37,7 @@ defmodule Jido.Shell.Command.Registry do
       "cd" => Jido.Shell.Command.Cd,
       "mkdir" => Jido.Shell.Command.Mkdir,
       "write" => Jido.Shell.Command.Write,
+      "bash" => Jido.Shell.Command.Bash,
       "sleep" => Jido.Shell.Command.Sleep,
       "seq" => Jido.Shell.Command.Seq,
       "help" => Jido.Shell.Command.Help,

@@ -22,6 +22,7 @@ defmodule Jido.Shell.Command.RegistryTest do
       names = Registry.list()
       assert "echo" in names
       assert "pwd" in names
+      assert "bash" in names
     end
   end
 
@@ -31,6 +32,7 @@ defmodule Jido.Shell.Command.RegistryTest do
       assert is_map(commands)
       assert commands["echo"] == Jido.Shell.Command.Echo
       assert commands["pwd"] == Jido.Shell.Command.Pwd
+      assert commands["bash"] == Jido.Shell.Command.Bash
     end
   end
 end
