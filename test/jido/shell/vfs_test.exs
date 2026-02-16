@@ -8,9 +8,11 @@ defmodule Jido.Shell.VFSTest do
     workspace_id = :"test_ws_#{System.unique_integer([:positive])}"
     fs_name = :"test_fs_#{System.unique_integer([:positive])}"
 
-    start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+    start_supervised!(
+      {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+    )
 
-    :ok = VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+    :ok = VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
     on_exit(fn ->
       VFS.unmount(workspace_id, "/")
@@ -95,7 +97,7 @@ defmodule Jido.Shell.VFSTest do
       {:ok, stat} = VFS.stat(workspace_id, "/statme.txt")
       assert stat.name == "statme.txt"
       assert stat.size == 7
-      assert %Hako.Stat.File{} = stat
+      assert %Jido.VFS.Stat.File{} = stat
     end
 
     test "returns stats for a directory", %{workspace_id: workspace_id} do
@@ -103,12 +105,12 @@ defmodule Jido.Shell.VFSTest do
 
       {:ok, stat} = VFS.stat(workspace_id, "/mydir")
       assert stat.name == "mydir"
-      assert %Hako.Stat.Dir{} = stat
+      assert %Jido.VFS.Stat.Dir{} = stat
     end
 
     test "returns stats for root", %{workspace_id: workspace_id} do
       {:ok, stat} = VFS.stat(workspace_id, "/")
-      assert %Hako.Stat.Dir{} = stat
+      assert %Jido.VFS.Stat.Dir{} = stat
     end
 
     test "returns error for non-existent path", %{workspace_id: workspace_id} do

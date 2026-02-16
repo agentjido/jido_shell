@@ -39,7 +39,7 @@ Jido.Shell.Supervisor
 ├── DynamicSupervisor (Jido.Shell.SessionSupervisor)
 │   └── SessionServer processes
 ├── DynamicSupervisor (Jido.Shell.FilesystemSupervisor)
-│   └── Hako adapter processes
+│   └── Jido.VFS adapter processes
 └── Task.Supervisor (Jido.Shell.CommandTaskSupervisor)
     └── Command task processes
 ```

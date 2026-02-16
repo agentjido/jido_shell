@@ -12,9 +12,11 @@ defmodule Jido.Shell.Command.CdTest do
     workspace_id = :"test_ws_#{System.unique_integer([:positive])}"
     fs_name = :"test_fs_#{System.unique_integer([:positive])}"
 
-    start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+    start_supervised!(
+      {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+    )
 
-    :ok = VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+    :ok = VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
     :ok = VFS.mkdir(workspace_id, "/home")
     :ok = VFS.mkdir(workspace_id, "/home/user")

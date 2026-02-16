@@ -2,13 +2,13 @@ defmodule Jido.Shell.VFS do
   @moduledoc """
   Virtual File System for Kodo workspaces.
 
-  Provides a unified filesystem API over multiple Hako adapters,
+  Provides a unified filesystem API over multiple Jido.VFS adapters,
   with mount points routing operations to the appropriate backend.
 
   ## Example
 
       # Mount an in-memory filesystem at root
-      :ok = Jido.Shell.VFS.mount(:my_workspace, "/", Hako.Adapter.InMemory, [name: :my_fs])
+      :ok = Jido.Shell.VFS.mount(:my_workspace, "/", Jido.VFS.Adapter.InMemory, [name: :my_fs])
 
       # Write a file
       :ok = Jido.Shell.VFS.write_file(:my_workspace, "/hello.txt", "Hello!")
@@ -32,7 +32,7 @@ defmodule Jido.Shell.VFS do
   end
 
   @doc """
-  Mounts a Hako adapter at the given path.
+  Mounts a Jido.VFS adapter at the given path.
   """
   @spec mount(workspace_id(), path(), module(), keyword()) :: :ok | {:error, term()}
   def mount(workspace_id, mount_path, adapter, opts \\ []) do
@@ -63,7 +63,7 @@ defmodule Jido.Shell.VFS do
   @spec read_file(workspace_id(), path()) :: {:ok, binary()} | {:error, Jido.Shell.Error.t()}
   def read_file(workspace_id, path) do
     with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
-      case Hako.read(mount.filesystem, relative_path) do
+      case Jido.VFS.read(mount.filesystem, relative_path) do
         {:ok, _} = result -> result
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
       end
@@ -76,7 +76,7 @@ defmodule Jido.Shell.VFS do
   @spec write_file(workspace_id(), path(), binary()) :: :ok | {:error, Jido.Shell.Error.t()}
   def write_file(workspace_id, path, content) do
     with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
-      case Hako.write(mount.filesystem, relative_path, content) do
+      case Jido.VFS.write(mount.filesystem, relative_path, content) do
         :ok -> :ok
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
       end
@@ -89,7 +89,7 @@ defmodule Jido.Shell.VFS do
   @spec delete(workspace_id(), path()) :: :ok | {:error, Jido.Shell.Error.t()}
   def delete(workspace_id, path) do
     with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
-      case Hako.delete(mount.filesystem, relative_path) do
+      case Jido.VFS.delete(mount.filesystem, relative_path) do
         :ok -> :ok
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
       end
@@ -102,7 +102,7 @@ defmodule Jido.Shell.VFS do
   @spec list_dir(workspace_id(), path()) :: {:ok, [map()]} | {:error, Jido.Shell.Error.t()}
   def list_dir(workspace_id, path) do
     with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
-      case Hako.list_contents(mount.filesystem, relative_path) do
+      case Jido.VFS.list_contents(mount.filesystem, relative_path) do
         {:ok, _} = result -> result
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
       end
@@ -122,13 +122,13 @@ defmodule Jido.Shell.VFS do
             n -> n
           end
 
-        {:ok, %Hako.Stat.Dir{name: name, size: 0}}
+        {:ok, %Jido.VFS.Stat.Dir{name: name, size: 0}}
       else
         parent = Path.dirname(relative_path)
         parent = if parent == ".", do: ".", else: parent
         name = Path.basename(relative_path)
 
-        case Hako.list_contents(mount.filesystem, parent) do
+        case Jido.VFS.list_contents(mount.filesystem, parent) do
           {:ok, entries} ->
             case Enum.find(entries, fn e -> e.name == name end) do
               nil -> {:error, Jido.Shell.Error.vfs(:not_found, path)}
@@ -164,7 +164,7 @@ defmodule Jido.Shell.VFS do
           do: relative_path,
           else: relative_path <> "/"
 
-      case Hako.create_directory(mount.filesystem, dir_path) do
+      case Jido.VFS.create_directory(mount.filesystem, dir_path) do
         :ok -> :ok
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
       end
@@ -188,11 +188,11 @@ defmodule Jido.Shell.VFS do
     |> String.replace(~r{/+}, "/")
   end
 
-  defp error_code(%{__struct__: Hako.Errors.FileNotFound}), do: :not_found
-  defp error_code(%{__struct__: Hako.Errors.DirectoryNotEmpty}), do: :directory_not_empty
-  defp error_code(%{__struct__: Hako.Errors.NotDirectory}), do: :not_directory
-  defp error_code(%{__struct__: Hako.Errors.PathTraversal}), do: :path_traversal
-  defp error_code(%{__struct__: Hako.Errors.AbsolutePath}), do: :absolute_path
+  defp error_code(%{__struct__: Jido.VFS.Errors.FileNotFound}), do: :not_found
+  defp error_code(%{__struct__: Jido.VFS.Errors.DirectoryNotEmpty}), do: :directory_not_empty
+  defp error_code(%{__struct__: Jido.VFS.Errors.NotDirectory}), do: :not_directory
+  defp error_code(%{__struct__: Jido.VFS.Errors.PathTraversal}), do: :path_traversal
+  defp error_code(%{__struct__: Jido.VFS.Errors.AbsolutePath}), do: :absolute_path
   defp error_code(:unsupported), do: :unsupported
   defp error_code(reason) when is_atom(reason), do: reason
   defp error_code(_), do: :unknown

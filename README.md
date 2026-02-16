@@ -10,7 +10,7 @@ Jido.Shell provides an Elixir-native virtual shell with an in-memory filesystem,
 
 ## Features
 
-- **Virtual Filesystem** - In-memory VFS with [Hako](https://github.com/agentjido/hako) adapter support
+- **Virtual Filesystem** - In-memory VFS with [Jido.VFS](https://github.com/agentjido/hako) adapter support
 - **Familiar Shell Interface** - Unix-like commands (ls, cd, cat, echo, etc.)
 - **Streaming Output** - Real-time command output via pub/sub events
 - **Session Management** - Multiple isolated sessions per workspace
@@ -19,12 +19,22 @@ Jido.Shell provides an Elixir-native virtual shell with an in-memory filesystem,
 
 ## Installation
 
-Add `kodo` to your dependencies in `mix.exs`:
+### Igniter Installation
+If your project has [Igniter](https://hexdocs.pm/igniter/readme.html) available, 
+you can install Jido Shell using the command 
+
+```bash
+mix igniter.install jido_shell
+```
+
+### Manual Installation
+
+Add `jido_shell` to your dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:kodo, "~> 3.0"}
+    {:jido_shell, "~> 1.0"}
   ]
 end
 ```
@@ -35,10 +45,10 @@ end
 
 ```bash
 # Start IEx-style shell
-mix kodo
+mix jido_shell
 
 # Start with rich terminal UI
-mix kodo --ui
+mix jido_shell --ui
 ```
 
 ### Programmatic Usage (Agent API)
@@ -100,35 +110,35 @@ end
 
 ## Available Commands
 
-| Command | Description |
-|---------|-------------|
-| `echo [args...]` | Print arguments to output |
-| `pwd` | Print working directory |
-| `cd [path]` | Change directory |
-| `ls [path]` | List directory contents |
-| `cat <file>` | Display file contents |
-| `write <file> <content>` | Write content to file |
-| `mkdir <dir>` | Create directory |
-| `rm <file>` | Remove file |
-| `cp <src> <dest>` | Copy file |
-| `env [VAR] [VAR=value]` | Display or set environment variables |
-| `help [command]` | Show available commands |
-| `sleep <seconds>` | Sleep for duration |
-| `seq <count> [delay]` | Print sequence of numbers |
+| Command                   | Description                           |
+|---------------------------|---------------------------------------|
+| `echo [args...]`          | Print arguments to output             |
+| `pwd`                     | Print working directory               |
+| `cd [path]`               | Change directory                      |
+| `ls [path]`               | List directory contents               |
+| `cat <file>`              | Display file contents                 |
+| `write <file> <content>`  | Write content to file                 |
+| `mkdir <dir>`             | Create directory                      |
+| `rm <file>`               | Remove file                           |
+| `cp <src> <dest>`         | Copy file                             |
+| `env [VAR] [VAR=value]`   | Display or set environment variables  |
+| `help [command]`          | Show available commands               |
+| `sleep <seconds>`         | Sleep for duration                    |
+| `seq <count> [delay]`     | Print sequence of numbers             |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Transports                                                      │
-│  • Jido.Shell.Transport.IEx (interactive shell in IEx)                │
-│  • Jido.Shell.Transport.TermUI (rich terminal UI)                     │
-│  • Jido.Shell.Agent (programmatic API for agents)                     │
+│  • Jido.Shell.Transport.IEx (interactive shell in IEx)          │
+│  • Jido.Shell.Transport.TermUI (rich terminal UI)               │
+│  • Jido.Shell.Agent (programmatic API for agents)               │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ subscribe / run_command
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.SessionServer (GenServer per session)                      │
+│ Jido.Shell.SessionServer (GenServer per session)                │
 │  • Holds session state (cwd, env, history)                      │
 │  • Manages transport subscriptions                              │
 │  • Spawns command tasks, broadcasts output                      │
@@ -136,23 +146,23 @@ end
                            │ spawn Task under CommandTaskSupervisor
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.CommandRunner (Task process)                               │
+│ Jido.Shell.CommandRunner (Task process)                         │
 │  • Executes command logic                                       │
 │  • Streams output back to session                               │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ calls
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.Command modules (@behaviour Jido.Shell.Command)                  │
+│ Jido.Shell.Command modules (@behaviour Jido.Shell.Command)      │
 │  • name/0, summary/0, schema/0                                  │
 │  • run/3 (state, args, emit)                                    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.VFS                                                        │
+│ Jido.Shell.VFS                                                  │
 │  • Router + ETS mount table                                     │
-│  • File operations over Hako adapters                           │
+│  • File operations over Jido.VFS adapters                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -190,23 +200,23 @@ end
 
 When subscribed to a session, you receive these events:
 
-| Event | Description |
-|-------|-------------|
-| `{:command_started, line}` | Command execution began |
-| `{:output, chunk}` | Streaming output chunk |
-| `{:error, Jido.Shell.Error.t()}` | Error occurred |
-| `{:cwd_changed, path}` | Working directory changed |
-| `:command_done` | Command completed successfully |
-| `:command_cancelled` | Command was cancelled |
-| `{:command_crashed, reason}` | Task terminated abnormally |
+| Event                             | Description                    |
+|-----------------------------------|--------------------------------|
+| `{:command_started, line}`        | Command execution began        |
+| `{:output, chunk}`                | Streaming output chunk         |
+| `{:error, Jido.Shell.Error.t()}`  | Error occurred                 |
+| `{:cwd_changed, path}`            | Working directory changed      |
+| `:command_done`                   | Command completed successfully |
+| `:command_cancelled`              | Command was cancelled          |
+| `{:command_crashed, reason}`      | Task terminated abnormally     |
 
 ## Mounting Local Filesystems
 
-Jido.Shell can mount real directories using Hako adapters:
+Jido.Shell can mount real directories using Jido.VFS adapters:
 
 ```elixir
 # Mount a local directory
-:ok = Jido.Shell.VFS.mount(:workspace, "/code", Hako.Adapter.Local, prefix: "/path/to/project")
+:ok = Jido.Shell.VFS.mount(:workspace, "/code", Jido.VFS.Adapter.Local, prefix: "/path/to/project")
 
 # Start session - now /code maps to the real directory
 {:ok, session} = Jido.Shell.Agent.new(:workspace)

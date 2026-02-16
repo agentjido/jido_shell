@@ -68,7 +68,7 @@ defmodule Jido.Shell.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.14"},
-      {:hako, github: "agentjido/hako"},
+      {:jido_vfs, github: "agentjido/hako"},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -78,7 +78,10 @@ defmodule Jido.Shell.MixProject do
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:mimic, "~> 2.0", only: :test},
-      {:stream_data, "~> 1.0", only: [:dev, :test]}
+      {:stream_data, "~> 1.0", only: [:dev, :test]},
+
+      # Code generation
+      {:igniter, "~> 0.7", optional: true}
     ]
   end
 

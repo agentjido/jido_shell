@@ -25,28 +25,32 @@ defmodule Jido.Shell.VFS.MountTableTest do
 
   describe "mount/4" do
     test "mounts a filesystem at a path", %{workspace_id: workspace_id, fs_name: fs_name} do
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+      )
 
-      assert :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+      assert :ok = MountTable.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
       assert [mount] = MountTable.list(workspace_id)
       assert mount.path == "/"
-      assert mount.adapter == Hako.Adapter.InMemory
+      assert mount.adapter == Jido.VFS.Adapter.InMemory
     end
 
     test "mounts multiple filesystems at different paths", %{workspace_id: workspace_id} do
       fs1 = :"fs1_#{System.unique_integer([:positive])}"
       fs2 = :"fs2_#{System.unique_integer([:positive])}"
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs1}}},
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs1}}},
         id: :fs1
       )
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs2}}},
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs2}}},
         id: :fs2
       )
 
-      assert :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs1)
-      assert :ok = MountTable.mount(workspace_id, "/data", Hako.Adapter.InMemory, name: fs2)
+      assert :ok = MountTable.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs1)
+      assert :ok = MountTable.mount(workspace_id, "/data", Jido.VFS.Adapter.InMemory, name: fs2)
 
       mounts = MountTable.list(workspace_id)
       assert length(mounts) == 2
@@ -55,9 +59,11 @@ defmodule Jido.Shell.VFS.MountTableTest do
 
   describe "unmount/2" do
     test "unmounts an existing mount", %{workspace_id: workspace_id, fs_name: fs_name} do
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+      )
 
-      :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+      :ok = MountTable.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
       assert :ok = MountTable.unmount(workspace_id, "/")
       assert [] = MountTable.list(workspace_id)
@@ -78,21 +84,24 @@ defmodule Jido.Shell.VFS.MountTableTest do
       fs2 = :"fs2_#{System.unique_integer([:positive])}"
       fs3 = :"fs3_#{System.unique_integer([:positive])}"
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs1}}},
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs1}}},
         id: :fs1
       )
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs2}}},
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs2}}},
         id: :fs2
       )
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs3}}},
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs3}}},
         id: :fs3
       )
 
-      :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs1)
-      :ok = MountTable.mount(workspace_id, "/data", Hako.Adapter.InMemory, name: fs2)
-      :ok = MountTable.mount(workspace_id, "/data/logs", Hako.Adapter.InMemory, name: fs3)
+      :ok = MountTable.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs1)
+      :ok = MountTable.mount(workspace_id, "/data", Jido.VFS.Adapter.InMemory, name: fs2)
+      :ok = MountTable.mount(workspace_id, "/data/logs", Jido.VFS.Adapter.InMemory, name: fs3)
 
       mounts = MountTable.list(workspace_id)
       paths = Enum.map(mounts, & &1.path)
@@ -102,9 +111,11 @@ defmodule Jido.Shell.VFS.MountTableTest do
 
   describe "resolve/2" do
     test "resolves path to root mount", %{workspace_id: workspace_id, fs_name: fs_name} do
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+      )
 
-      :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+      :ok = MountTable.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
       {:ok, mount, relative} = MountTable.resolve(workspace_id, "/test.txt")
       assert mount.path == "/"
@@ -119,16 +130,18 @@ defmodule Jido.Shell.VFS.MountTableTest do
       fs1 = :"fs1_#{System.unique_integer([:positive])}"
       fs2 = :"fs2_#{System.unique_integer([:positive])}"
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs1}}},
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs1}}},
         id: :fs1
       )
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs2}}},
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs2}}},
         id: :fs2
       )
 
-      :ok = MountTable.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs1)
-      :ok = MountTable.mount(workspace_id, "/data", Hako.Adapter.InMemory, name: fs2)
+      :ok = MountTable.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs1)
+      :ok = MountTable.mount(workspace_id, "/data", Jido.VFS.Adapter.InMemory, name: fs2)
 
       {:ok, mount, relative} = MountTable.resolve(workspace_id, "/data/file.txt")
       assert mount.path == "/data"
@@ -142,9 +155,11 @@ defmodule Jido.Shell.VFS.MountTableTest do
     test "resolves mount point itself", %{workspace_id: workspace_id} do
       fs_name = :"fs_#{System.unique_integer([:positive])}"
 
-      start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+      start_supervised!(
+        {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+      )
 
-      :ok = MountTable.mount(workspace_id, "/data", Hako.Adapter.InMemory, name: fs_name)
+      :ok = MountTable.mount(workspace_id, "/data", Jido.VFS.Adapter.InMemory, name: fs_name)
 
       {:ok, mount, relative} = MountTable.resolve(workspace_id, "/data")
       assert mount.path == "/data"

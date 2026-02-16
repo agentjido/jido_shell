@@ -29,9 +29,11 @@ defmodule Jido.Shell.AgentTest do
     workspace_id = :"agent_test_#{System.unique_integer([:positive])}"
     fs_name = :"agent_fs_#{System.unique_integer([:positive])}"
 
-    start_supervised!({Hako.Adapter.InMemory, {Hako.Adapter.InMemory, %Hako.Adapter.InMemory.Config{name: fs_name}}})
+    start_supervised!(
+      {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
+    )
 
-    :ok = VFS.mount(workspace_id, "/", Hako.Adapter.InMemory, name: fs_name)
+    :ok = VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
     on_exit(fn ->
       VFS.unmount(workspace_id, "/")

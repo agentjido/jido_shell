@@ -34,7 +34,7 @@ defmodule Jido.Shell.Command.Cd do
       end
 
     case Jido.Shell.VFS.stat(state.workspace_id, target) do
-      {:ok, %Hako.Stat.Dir{}} ->
+      {:ok, %Jido.VFS.Stat.Dir{}} ->
         {:ok, {:state_update, %{cwd: target}}}
 
       {:ok, _} ->
