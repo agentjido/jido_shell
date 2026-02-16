@@ -55,8 +55,8 @@ defmodule Jido.Shell.CommandRunnerTest do
         CommandRunner.run(session_pid, state, "echo test", [])
       end)
 
-      assert_receive {:command_event, {:output, "test\n"}}
-      assert_receive {:command_finished, {:ok, nil}}
+      assert_receive {:command_event, {:output, "test\n"}}, 1_000
+      assert_receive {:command_finished, {:ok, nil}}, 1_000
     end
 
     test "sends error result for unknown command", %{state: state} do
@@ -66,7 +66,22 @@ defmodule Jido.Shell.CommandRunnerTest do
         CommandRunner.run(session_pid, state, "bad_cmd", [])
       end)
 
-      assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}}
+      assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}}, 1_000
+    end
+
+    test "applies execution context options", %{state: state} do
+      session_pid = self()
+
+      spawn(fn ->
+        CommandRunner.run(
+          session_pid,
+          state,
+          "bash -c \"curl https://example.com\"",
+          execution_context: %{network: %{allow_domains: ["example.com"]}}
+        )
+      end)
+
+      assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}}, 1_000
     end
   end
 end

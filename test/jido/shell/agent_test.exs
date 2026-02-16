@@ -83,6 +83,22 @@ defmodule Jido.Shell.AgentTest do
       {:ok, output} = Agent.run(session_id, "ls /")
       assert output =~ "testdir"
     end
+
+    test "denies sandbox network by default", %{session_id: session_id} do
+      {:error, error} = Agent.run(session_id, "bash -c \"curl https://example.com\"")
+      assert error.code == {:shell, :network_blocked}
+    end
+
+    test "allows per-execution network context overrides", %{session_id: session_id} do
+      {:error, error} =
+        Agent.run(
+          session_id,
+          "bash -c \"curl https://example.com\"",
+          execution_context: %{network: %{allow_domains: ["example.com"]}}
+        )
+
+      assert error.code == {:shell, :unknown_command}
+    end
   end
 
   describe "file operations" do

@@ -52,6 +52,9 @@ defmodule Jido.Shell.SessionServer do
 
   @doc """
   Runs a command in the session.
+
+  `opts` are passed to the command task context (for example
+  `execution_context: %{network: %{allow_domains: [...]}}`).
   """
   @spec run_command(String.t(), String.t(), keyword()) :: :ok
   def run_command(session_id, line, opts \\ []) do
