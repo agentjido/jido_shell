@@ -5,7 +5,7 @@ defmodule Jido.Shell.CommandRunnerTest do
   alias Jido.Shell.Session.State
 
   setup do
-    {:ok, state} = State.new(%{id: "test-session", workspace_id: :test, cwd: "/home/user"})
+    {:ok, state} = State.new(%{id: "test-session", workspace_id: "test", cwd: "/home/user"})
     {:ok, state: state}
   end
 
@@ -43,7 +43,50 @@ defmodule Jido.Shell.CommandRunnerTest do
 
       result = CommandRunner.execute(state, "", emit)
 
-      assert {:error, :empty_command} = result
+      assert {:error, %Jido.Shell.Error{code: {:shell, :empty_command}}} = result
+    end
+
+    test "returns syntax errors for malformed command lines", %{state: state} do
+      emit = fn _event -> :ok end
+
+      result = CommandRunner.execute(state, ~s(echo "unterminated), emit)
+
+      assert {:error, %Jido.Shell.Error{code: {:shell, :syntax_error}}} = result
+    end
+
+    test "returns validation errors when argument schema parsing fails", %{state: state} do
+      emit = fn _event -> :ok end
+
+      result = CommandRunner.execute(state, "sleep 1 2", emit)
+
+      assert {:error, %Jido.Shell.Error{code: {:validation, :invalid_args}}} = result
+    end
+
+    test "supports semicolon chaining and continues after errors", %{state: state} do
+      emit = fn event -> send(self(), {:emit, event}) end
+
+      result = CommandRunner.execute(state, "unknown_cmd; echo recovered", emit)
+
+      assert {:ok, nil} = result
+      assert_receive {:emit, {:output, "recovered\n"}}
+    end
+
+    test "supports and-if chaining and short-circuits on error", %{state: state} do
+      emit = fn event -> send(self(), {:emit, event}) end
+
+      result = CommandRunner.execute(state, "unknown_cmd && echo skipped", emit)
+
+      assert {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}} = result
+      refute_receive {:emit, {:output, "skipped\n"}}
+    end
+
+    test "preserves state updates across chained commands", %{state: state} do
+      emit = fn event -> send(self(), {:emit, event}) end
+
+      result = CommandRunner.execute(state, "env FOO=bar && env FOO", emit)
+
+      assert {:ok, {:state_update, %{env: %{"FOO" => "bar"}}}} = result
+      assert_receive {:emit, {:output, "FOO=bar\n"}}
     end
   end
 
@@ -82,6 +125,68 @@ defmodule Jido.Shell.CommandRunnerTest do
       end)
 
       assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}}, 1_000
+    end
+
+    test "enforces runtime limits from execution context", %{state: state} do
+      session_pid = self()
+
+      spawn(fn ->
+        CommandRunner.run(
+          session_pid,
+          state,
+          "sleep 2",
+          execution_context: %{limits: %{max_runtime_ms: 100}}
+        )
+      end)
+
+      assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:command, :runtime_limit_exceeded}}}}, 1_000
+    end
+
+    test "accepts runtime and output limits as positive strings", %{state: state} do
+      session_pid = self()
+
+      spawn(fn ->
+        CommandRunner.run(
+          session_pid,
+          state,
+          "echo ok",
+          execution_context: %{limits: %{"max_runtime_ms" => "1000", "max_output_bytes" => "1000"}}
+        )
+      end)
+
+      assert_receive {:command_event, {:output, "ok\n"}}, 1_000
+      assert_receive {:command_finished, {:ok, nil}}, 1_000
+    end
+
+    test "ignores invalid string limits and non-keyword execution contexts", %{state: state} do
+      session_pid = self()
+
+      spawn(fn ->
+        CommandRunner.run(
+          session_pid,
+          state,
+          "echo pass",
+          execution_context: [limits: [{"max_runtime_ms", "bad"}], max_output_bytes: "bad"]
+        )
+      end)
+
+      assert_receive {:command_event, {:output, "pass\n"}}, 1_000
+      assert_receive {:command_finished, {:ok, nil}}, 1_000
+    end
+
+    test "enforces output size limits from execution context", %{state: state} do
+      session_pid = self()
+
+      spawn(fn ->
+        CommandRunner.run(
+          session_pid,
+          state,
+          "seq 10 0",
+          execution_context: %{limits: %{max_output_bytes: 3}}
+        )
+      end)
+
+      assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:command, :output_limit_exceeded}}}}, 1_000
     end
   end
 end

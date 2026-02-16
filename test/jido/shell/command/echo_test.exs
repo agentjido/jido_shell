@@ -5,7 +5,7 @@ defmodule Jido.Shell.Command.EchoTest do
   alias Jido.Shell.Session.State
 
   setup do
-    {:ok, state} = State.new(%{id: "test", workspace_id: :test})
+    {:ok, state} = State.new(%{id: "test", workspace_id: "test"})
     {:ok, state: state}
   end
 

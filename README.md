@@ -1,40 +1,36 @@
 # Jido.Shell
 
-[![Hex.pm](https://img.shields.io/hexpm/v/kodo.svg)](https://hex.pm/packages/kodo)
-[![Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/kodo)
-[![CI](https://github.com/agentjido/kodo/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/kodo/actions/workflows/ci.yml)
+[![Hex.pm](https://img.shields.io/hexpm/v/jido_shell.svg)](https://hex.pm/packages/jido_shell)
+[![Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/jido_shell)
+[![CI](https://github.com/agentjido/jido_shell/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido_shell/actions/workflows/ci.yml)
 
 Virtual workspace shell for LLM-human collaboration in the AgentJido ecosystem.
 
-Jido.Shell provides an Elixir-native virtual shell with an in-memory filesystem, streaming output, and both interactive and programmatic interfaces. It's designed for AI agents that need to manipulate files and run commands in isolated, sandboxed environments.
+Jido.Shell provides an Elixir-native virtual shell with in-memory filesystems, streaming output, structured errors, and synchronous agent-friendly APIs.
 
 ## Features
 
-- **Virtual Filesystem** - In-memory VFS with [Jido.VFS](https://github.com/agentjido/hako) adapter support
-- **Familiar Shell Interface** - Unix-like commands (ls, cd, cat, echo, etc.)
-- **Streaming Output** - Real-time command output via pub/sub events
-- **Session Management** - Multiple isolated sessions per workspace
-- **Agent-Friendly API** - Simple synchronous interface for AI agents
-- **Interactive Transports** - IEx REPL and rich terminal UI
+- Virtual filesystem with [Jido.VFS](https://github.com/agentjido/hako) adapter support
+- Unix-like built-in commands (`ls`, `cd`, `cat`, `write`, `rm`, `cp`, `env`, `bash`)
+- Session-scoped state (`cwd`, env vars, history)
+- Streaming session events (`{:jido_shell_session, session_id, event}`)
+- Top-level command chaining: `;` (always continue), `&&` (short-circuit on error)
+- Per-command sandbox controls for network and execution limits
 
 ## Installation
 
-### Igniter Installation
-If your project has [Igniter](https://hexdocs.pm/igniter/readme.html) available, 
-you can install Jido Shell using the command 
+### Igniter
 
 ```bash
 mix igniter.install jido_shell
 ```
 
-### Manual Installation
-
-Add `jido_shell` to your dependencies in `mix.exs`:
+### Manual
 
 ```elixir
 def deps do
   [
-    {:jido_shell, "~> 1.0"}
+    {:jido_shell, "~> 3.0"}
   ]
 end
 ```
@@ -44,211 +40,144 @@ end
 ### Interactive Shell
 
 ```bash
-# Start IEx-style shell
 mix jido_shell
-
-# Start with rich terminal UI
-mix jido_shell --ui
+mix jido_shell --workspace my_workspace
 ```
 
-### Programmatic Usage (Agent API)
+### Agent API
 
 ```elixir
-# Create a new session with in-memory VFS
-{:ok, session} = Jido.Shell.Agent.new(:my_workspace)
+{:ok, session} = Jido.Shell.Agent.new("my_workspace")
 
-# Run commands synchronously
-{:ok, output} = Jido.Shell.Agent.run(session, "echo Hello World")
-# => {:ok, "Hello World\n"}
+{:ok, "Hello\n"} = Jido.Shell.Agent.run(session, "echo Hello")
+{:ok, "/\n"} = Jido.Shell.Agent.run(session, "pwd")
 
-{:ok, output} = Jido.Shell.Agent.run(session, "pwd")
-# => {:ok, "/\n"}
+:ok = Jido.Shell.Agent.write_file(session, "/hello.txt", "world")
+{:ok, "world"} = Jido.Shell.Agent.read_file(session, "/hello.txt")
 
-# File operations
-:ok = Jido.Shell.Agent.write_file(session, "/hello.txt", "Hello from Jido.Shell!")
-{:ok, content} = Jido.Shell.Agent.read_file(session, "/hello.txt")
-# => {:ok, "Hello from Jido.Shell!"}
-
-# Directory operations
-{:ok, _} = Jido.Shell.Agent.run(session, "mkdir /projects")
-{:ok, _} = Jido.Shell.Agent.run(session, "cd /projects")
-{:ok, entries} = Jido.Shell.Agent.list_dir(session, "/")
-
-# Run multiple commands
-results = Jido.Shell.Agent.run_all(session, ["mkdir /docs", "cd /docs", "pwd"])
-
-# Clean up
+{:ok, "/"} = Jido.Shell.Agent.cwd(session)
 :ok = Jido.Shell.Agent.stop(session)
 ```
 
 ### Low-Level Session API
 
-For more control over session events:
-
 ```elixir
-# Start a session with VFS
-{:ok, session_id} = Jido.Shell.Session.start_with_vfs(:my_workspace)
+{:ok, session_id} = Jido.Shell.Session.start_with_vfs("my_workspace")
+{:ok, :subscribed} = Jido.Shell.SessionServer.subscribe(session_id, self())
 
-# Subscribe to events
-:ok = Jido.Shell.SessionServer.subscribe(session_id, self())
+{:ok, :accepted} = Jido.Shell.SessionServer.run_command(session_id, "echo hi")
 
-# Run commands (async, streams events)
-:ok = Jido.Shell.SessionServer.run_command(session_id, "ls -la")
-
-# Receive events
 receive do
-  {:kodo_session, ^session_id, {:output, chunk}} -> IO.write(chunk)
-  {:kodo_session, ^session_id, :command_done} -> :done
+  {:jido_shell_session, ^session_id, {:output, chunk}} -> IO.write(chunk)
+  {:jido_shell_session, ^session_id, :command_done} -> :ok
 end
 
-# Cancel running command
-:ok = Jido.Shell.SessionServer.cancel(session_id)
-
-# Stop session
+{:ok, :cancelled} = Jido.Shell.SessionServer.cancel(session_id)
 :ok = Jido.Shell.Session.stop(session_id)
 ```
 
-## Available Commands
+## Command Chaining
 
-| Command                   | Description                           |
-|---------------------------|---------------------------------------|
-| `echo [args...]`          | Print arguments to output             |
-| `pwd`                     | Print working directory               |
-| `cd [path]`               | Change directory                      |
-| `ls [path]`               | List directory contents               |
-| `cat <file>`              | Display file contents                 |
-| `write <file> <content>`  | Write content to file                 |
-| `mkdir <dir>`             | Create directory                      |
-| `rm <file>`               | Remove file                           |
-| `cp <src> <dest>`         | Copy file                             |
-| `bash -c "<script>"`      | Run a bash-like script in sandbox     |
-| `env [VAR] [VAR=value]`   | Display or set environment variables  |
-| `help [command]`          | Show available commands               |
-| `sleep <seconds>`         | Sleep for duration                    |
-| `seq <count> [delay]`     | Print sequence of numbers             |
+Jido.Shell supports top-level chaining outside `bash`:
 
-### Bash Network Permissions
+- `;` always runs the next command.
+- `&&` runs the next command only if the previous command succeeded.
 
-Network-style commands inside `bash` scripts are denied by default.
+Examples:
 
-You can allow specific domains/ports per execution:
+```text
+echo one; echo two
+mkdir /tmp && cd /tmp && pwd
+```
+
+## Bash Sandbox
+
+`bash -c "..."` executes scripts through registered Jido.Shell commands (not the host shell).
+
+Network-style commands are denied by default. Allow per command with `execution_context.network`:
 
 ```elixir
 Jido.Shell.Agent.run(
-  session_id,
+  session,
   "bash -c \"curl https://example.com:8443\"",
   execution_context: %{
     network: %{
       allow_domains: ["example.com"],
-      allow_ports: [8443],
-      block_domains: [],
-      block_ports: []
+      allow_ports: [8443]
     }
   }
 )
 ```
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Transports                                                      │
-│  • Jido.Shell.Transport.IEx (interactive shell in IEx)          │
-│  • Jido.Shell.Transport.TermUI (rich terminal UI)               │
-│  • Jido.Shell.Agent (programmatic API for agents)               │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ subscribe / run_command
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.SessionServer (GenServer per session)                │
-│  • Holds session state (cwd, env, history)                      │
-│  • Manages transport subscriptions                              │
-│  • Spawns command tasks, broadcasts output                      │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ spawn Task under CommandTaskSupervisor
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.CommandRunner (Task process)                         │
-│  • Executes command logic                                       │
-│  • Streams output back to session                               │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ calls
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.Command modules (@behaviour Jido.Shell.Command)      │
-│  • name/0, summary/0, schema/0                                  │
-│  • run/3 (state, args, emit)                                    │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ Jido.Shell.VFS                                                  │
-│  • Router + ETS mount table                                     │
-│  • File operations over Jido.VFS adapters                           │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Creating Custom Commands
-
-Implement the `Jido.Shell.Command` behaviour:
+Optional execution limits are supported through `execution_context.limits`:
 
 ```elixir
-defmodule MyApp.Command.Greet do
-  @behaviour Jido.Shell.Command
-
-  @impl true
-  def name, do: "greet"
-
-  @impl true
-  def summary, do: "Greet someone"
-
-  @impl true
-  def schema do
-    Zoi.map(%{
-      args: Zoi.array(Zoi.string()) |> Zoi.default([])
-    })
-  end
-
-  @impl true
-  def run(_state, args, emit) do
-    name = Enum.join(args.args, " ") || "World"
-    emit.({:output, "Hello, #{name}!\n"})
-    {:ok, nil}
-  end
-end
+Jido.Shell.Agent.run(
+  session,
+  "seq 10000 0",
+  execution_context: %{
+    limits: %{
+      max_runtime_ms: 5_000,
+      max_output_bytes: 50_000
+    }
+  }
+)
 ```
+
+## Available Commands
+
+| Command | Description |
+|---|---|
+| `echo [args...]` | Print arguments |
+| `pwd` | Print working directory |
+| `cd [path]` | Change directory |
+| `ls [path]` | List directory contents |
+| `cat <file>` | Display file contents |
+| `write <file> <content>` | Write file |
+| `mkdir <dir>` | Create directory |
+| `rm <file...>` | Remove files |
+| `cp <src> <dest>` | Copy file |
+| `env [VAR] [VAR=value]` | Get/set environment variables |
+| `bash -c "<script>"` / `bash <file>` | Execute sandboxed script |
+| `sleep [seconds]` | Sleep (for cancellation testing) |
+| `seq [count] [delay_ms]` | Emit numeric sequence |
+| `help [command]` | Show help |
 
 ## Session Events
 
-When subscribed to a session, you receive these events:
-
-| Event                             | Description                    |
-|-----------------------------------|--------------------------------|
-| `{:command_started, line}`        | Command execution began        |
-| `{:output, chunk}`                | Streaming output chunk         |
-| `{:error, Jido.Shell.Error.t()}`  | Error occurred                 |
-| `{:cwd_changed, path}`            | Working directory changed      |
-| `:command_done`                   | Command completed successfully |
-| `:command_cancelled`              | Command was cancelled          |
-| `{:command_crashed, reason}`      | Task terminated abnormally     |
-
-## Mounting Local Filesystems
-
-Jido.Shell can mount real directories using Jido.VFS adapters:
+Events are published as:
 
 ```elixir
-# Mount a local directory
-:ok = Jido.Shell.VFS.mount(:workspace, "/code", Jido.VFS.Adapter.Local, prefix: "/path/to/project")
+{:jido_shell_session, session_id, event}
+```
 
-# Start session - now /code maps to the real directory
-{:ok, session} = Jido.Shell.Agent.new(:workspace)
+Event payloads:
+
+- `{:command_started, line}`
+- `{:output, chunk}`
+- `{:error, %Jido.Shell.Error{}}`
+- `{:cwd_changed, path}`
+- `:command_done`
+- `:command_cancelled`
+- `{:command_crashed, reason}`
+
+## Local Filesystem Mounts
+
+```elixir
+:ok = Jido.Shell.VFS.mount("workspace", "/code", Jido.VFS.Adapter.Local, prefix: "/path/to/project")
+
+{:ok, session} = Jido.Shell.Agent.new("workspace")
 {:ok, output} = Jido.Shell.Agent.run(session, "ls /code")
 ```
 
+## Breaking Changes in V1 Hardening
+
+Major V1 hardening changes are documented in [MIGRATION.md](MIGRATION.md).
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0 - see [LICENSE](LICENSE) for details.
+Apache-2.0. See [LICENSE](LICENSE).

@@ -5,7 +5,7 @@ defmodule Jido.Shell.Command.SeqTest do
   alias Jido.Shell.Command.Seq
 
   setup do
-    {:ok, state} = State.new(%{id: "test", workspace_id: :test})
+    {:ok, state} = State.new(%{id: "test", workspace_id: "test"})
     {:ok, state: state}
   end
 
@@ -53,6 +53,16 @@ defmodule Jido.Shell.Command.SeqTest do
         end)
 
       assert length(events) == 2
+    end
+
+    test "returns validation error for invalid count", %{state: state} do
+      assert {:error, %Jido.Shell.Error{code: {:validation, :invalid_args}}} =
+               Seq.run(state, %{args: ["abc", "0"]}, fn _ -> :ok end)
+    end
+
+    test "returns validation error for invalid delay", %{state: state} do
+      assert {:error, %Jido.Shell.Error{code: {:validation, :invalid_args}}} =
+               Seq.run(state, %{args: ["2", "-1"]}, fn _ -> :ok end)
     end
   end
 

@@ -1,176 +1,69 @@
 # Contributing to Jido.Shell
 
-Thank you for your interest in contributing to Jido.Shell! This document provides guidelines and instructions for contributing.
+Thanks for contributing.
 
 ## Development Setup
 
-1. Clone the repository:
-
 ```bash
-git clone https://github.com/agentjido/kodo.git
-cd kodo
-```
-
-2. Install dependencies and set up git hooks:
-
-```bash
+git clone https://github.com/agentjido/jido_shell.git
+cd jido_shell
 mix setup
-```
-
-3. Run tests to verify your setup:
-
-```bash
 mix test
 ```
 
-## Development Workflow
+## Quality Bar
 
-### Running Quality Checks
-
-Before submitting a PR, ensure all quality checks pass:
+Run before opening a PR:
 
 ```bash
-# Run all quality checks
 mix quality
+mix test
+mix test --include flaky
+mix coveralls
+```
 
-# Or run individually:
+## Common Commands
+
+```bash
 mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --min-priority higher
 mix dialyzer
+mix docs
 ```
 
-### Running Tests
+## Pull Requests
+
+1. Branch from `main`.
+2. Add tests for behavior changes.
+3. Keep docs and examples in sync.
+4. Use conventional commits.
+
+Examples:
 
 ```bash
-# Run tests
-mix test
-
-# Run tests with coverage
-mix coveralls.html
-
-# Run specific test file
-mix test test/kodo/agent_test.exs
-
-# Run tests matching a pattern
-mix test --only describe:"basic shell operations"
+git commit -m "feat(command): add xyz"
+git commit -m "fix(session): return typed errors for missing sessions"
+git commit -m "docs: update migration guide"
 ```
 
-### Code Style
+## Adding Commands
 
-- Follow standard Elixir conventions
-- Use `mix format` before committing
-- Keep functions small and focused
-- Add `@doc` and `@spec` for public functions
-- Use pattern matching over conditionals where appropriate
-
-## Commit Messages
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-### Types
-
-| Type | Description |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation only |
-| `style` | Formatting, no code change |
-| `refactor` | Code change, no fix or feature |
-| `perf` | Performance improvement |
-| `test` | Adding/fixing tests |
-| `chore` | Maintenance, deps, tooling |
-| `ci` | CI/CD changes |
-
-### Examples
-
-```bash
-git commit -m "feat(command): add mv command for moving files"
-git commit -m "fix(vfs): resolve path traversal in relative paths"
-git commit -m "docs: improve API documentation examples"
-git commit -m "feat!: breaking change to session API"
-```
-
-## Pull Request Process
-
-1. Create a feature branch from `main`:
-   ```bash
-   git checkout -b feat/my-feature
-   ```
-
-2. Make your changes with appropriate tests
-
-3. Ensure all checks pass:
-   ```bash
-   mix quality
-   mix test
-   ```
-
-4. Push and create a Pull Request
-
-5. Respond to review feedback
-
-## Adding New Commands
-
-To add a new command:
-
-1. Create a module implementing `Jido.Shell.Command` behaviour:
-
-```elixir
-defmodule Jido.Shell.Command.MyCommand do
-  @behaviour Jido.Shell.Command
-
-  @impl true
-  def name, do: "mycommand"
-
-  @impl true
-  def summary, do: "Brief description"
-
-  @impl true
-  def schema do
-    Zoi.map(%{
-      args: Zoi.array(Zoi.string()) |> Zoi.default([])
-    })
-  end
-
-  @impl true
-  def run(state, args, emit) do
-    # Implementation
-    emit.({:output, "Result\n"})
-    {:ok, nil}
-  end
-end
-```
-
-2. Register it in `Jido.Shell.Command.Registry`
-
-3. Add tests in `test/kodo/command/my_command_test.exs`
-
-4. Update the README command table
+1. Add a module under `lib/jido/shell/command/` implementing `Jido.Shell.Command`.
+2. Register it in `Jido.Shell.Command.Registry`.
+3. Add tests under `test/jido/shell/command/`.
+4. Update `README.md` command docs.
 
 ## Reporting Issues
 
-When reporting issues, please include:
+Please include:
 
-- Elixir and OTP versions (`elixir --version`)
+- Elixir/OTP versions
 - Jido.Shell version
-- Steps to reproduce
+- Reproduction steps
 - Expected vs actual behavior
-- Any error messages or stack traces
-
-## Questions?
-
-- Open a [GitHub Discussion](https://github.com/agentjido/kodo/discussions)
-- Join our [Discord](https://agentjido.xyz/discord)
+- Logs/stack traces
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the Apache-2.0 License.
+By contributing, you agree contributions are Apache-2.0 licensed.

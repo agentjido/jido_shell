@@ -4,9 +4,8 @@ defmodule Jido.Shell.Application do
 
   @impl true
   def start(_type, _args) do
-    Jido.Shell.VFS.init()
-
     children = [
+      {Jido.Shell.VFS.MountTable, []},
       {Registry, keys: :unique, name: Jido.Shell.SessionRegistry},
       {DynamicSupervisor, strategy: :one_for_one, name: Jido.Shell.SessionSupervisor},
       {DynamicSupervisor, strategy: :one_for_one, name: Jido.Shell.FilesystemSupervisor},

@@ -3,13 +3,17 @@ defmodule Jido.Shell.VFS.Mount do
   Represents a mounted filesystem at a path.
   """
 
-  defstruct [:path, :adapter, :filesystem, :opts]
+  defstruct [:path, :adapter, :filesystem, :opts, :child_pid, :ownership]
+
+  @type ownership :: :owned | :shared | :none
 
   @type t :: %__MODULE__{
           path: String.t(),
           adapter: module(),
           filesystem: Jido.VFS.filesystem(),
-          opts: keyword()
+          opts: keyword(),
+          child_pid: pid() | nil,
+          ownership: ownership()
         }
 
   @doc """
@@ -17,32 +21,40 @@ defmodule Jido.Shell.VFS.Mount do
   """
   @spec new(String.t(), module(), keyword()) :: {:ok, t()} | {:error, term()}
   def new(path, adapter, opts) do
-    case adapter.configure(opts) do
-      {^adapter, _config} = filesystem ->
-        :ok = maybe_start_filesystem(adapter, filesystem)
-
-        {:ok,
-         %__MODULE__{
-           path: normalize_path(path),
-           adapter: adapter,
-           filesystem: filesystem,
-           opts: opts
-         }}
-
-      {:error, _} = error ->
-        error
+    with {^adapter, _config} = filesystem <- adapter.configure(opts),
+         {:ok, child_pid, ownership} <- maybe_start_filesystem(adapter, filesystem) do
+      {:ok,
+       %__MODULE__{
+         path: normalize_path(path),
+         adapter: adapter,
+         filesystem: filesystem,
+         opts: opts,
+         child_pid: child_pid,
+         ownership: ownership
+       }}
+    else
+      {:error, _} = error -> error
+      other -> {:error, {:invalid_adapter_config, other}}
     end
   end
 
   defp maybe_start_filesystem(adapter, filesystem) do
     if function_exported?(adapter, :starts_processes, 0) and adapter.starts_processes() do
-      case DynamicSupervisor.start_child(Jido.Shell.FilesystemSupervisor, {adapter, filesystem}) do
-        {:ok, _pid} -> :ok
-        {:error, {:already_started, _pid}} -> :ok
-        {:error, reason} -> {:error, reason}
+      try do
+        case DynamicSupervisor.start_child(Jido.Shell.FilesystemSupervisor, {adapter, filesystem}) do
+          {:ok, pid} -> {:ok, pid, :owned}
+          {:error, {:already_started, pid}} -> {:ok, pid, :shared}
+          {:error, reason} -> {:error, reason}
+        end
+      rescue
+        error ->
+          {:error, {:start_child_failed, error}}
+      catch
+        kind, reason ->
+          {:error, {kind, reason}}
       end
     else
-      :ok
+      {:ok, nil, :none}
     end
   end
 

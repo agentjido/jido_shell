@@ -5,7 +5,7 @@ defmodule Jido.Shell.Command.SleepTest do
   alias Jido.Shell.Command.Sleep
 
   setup do
-    {:ok, state} = State.new(%{id: "test", workspace_id: :test})
+    {:ok, state} = State.new(%{id: "test", workspace_id: "test"})
     {:ok, state: state}
   end
 
@@ -38,6 +38,16 @@ defmodule Jido.Shell.Command.SleepTest do
     test "returns ok on success", %{state: state} do
       result = Sleep.run(state, %{args: ["1"]}, fn _ -> :ok end)
       assert {:ok, nil} = result
+    end
+
+    test "returns validation error for invalid numeric input", %{state: state} do
+      assert {:error, %Jido.Shell.Error{code: {:validation, :invalid_args}}} =
+               Sleep.run(state, %{args: ["not-a-number"]}, fn _ -> :ok end)
+    end
+
+    test "returns validation error for out-of-range seconds", %{state: state} do
+      assert {:error, %Jido.Shell.Error{code: {:validation, :invalid_args}}} =
+               Sleep.run(state, %{args: ["999999"]}, fn _ -> :ok end)
     end
   end
 

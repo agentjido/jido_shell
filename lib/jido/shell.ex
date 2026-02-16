@@ -18,7 +18,7 @@ defmodule Jido.Shell do
   ## Quick Start
 
       # Start a session
-      {:ok, session_id} = Jido.Shell.Session.start(:my_workspace)
+      {:ok, session_id} = Jido.Shell.Session.start("my_workspace")
 
       # Run commands
       Jido.Shell.SessionServer.run_command(session_id, "pwd")

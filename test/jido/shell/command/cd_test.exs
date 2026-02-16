@@ -9,8 +9,8 @@ defmodule Jido.Shell.Command.CdTest do
 
   setup do
     VFS.init()
-    workspace_id = :"test_ws_#{System.unique_integer([:positive])}"
-    fs_name = :"test_fs_#{System.unique_integer([:positive])}"
+    workspace_id = "test_ws_#{System.unique_integer([:positive])}"
+    fs_name = "test_fs_#{System.unique_integer([:positive])}"
 
     start_supervised!(
       {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
@@ -104,9 +104,9 @@ defmodule Jido.Shell.Command.CdTest do
   describe "integration with session" do
     test "cd changes session cwd", %{workspace_id: workspace_id} do
       {:ok, session_id} = Session.start(workspace_id)
-      :ok = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
 
-      :ok = SessionServer.run_command(session_id, "cd /home")
+      {:ok, :accepted} = SessionServer.run_command(session_id, "cd /home")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}
       assert_receive {:jido_shell_session, ^session_id, :command_done}
@@ -118,18 +118,18 @@ defmodule Jido.Shell.Command.CdTest do
 
     test "cwd_changed event is broadcast", %{workspace_id: workspace_id} do
       {:ok, session_id} = Session.start(workspace_id)
-      :ok = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
 
-      :ok = SessionServer.run_command(session_id, "cd /home/user")
+      {:ok, :accepted} = SessionServer.run_command(session_id, "cd /home/user")
 
       assert_receive {:jido_shell_session, ^session_id, {:cwd_changed, "/home/user"}}
     end
 
     test "relative path resolved from current cwd", %{workspace_id: workspace_id} do
       {:ok, session_id} = Session.start(workspace_id, cwd: "/home")
-      :ok = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
 
-      :ok = SessionServer.run_command(session_id, "cd user")
+      {:ok, :accepted} = SessionServer.run_command(session_id, "cd user")
 
       assert_receive {:jido_shell_session, ^session_id, :command_done}
       assert_receive {:jido_shell_session, ^session_id, {:cwd_changed, "/home/user"}}
@@ -140,9 +140,9 @@ defmodule Jido.Shell.Command.CdTest do
 
     test "error on cd to non-existent path", %{workspace_id: workspace_id} do
       {:ok, session_id} = Session.start(workspace_id)
-      :ok = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
 
-      :ok = SessionServer.run_command(session_id, "cd /nonexistent")
+      {:ok, :accepted} = SessionServer.run_command(session_id, "cd /nonexistent")
 
       assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:vfs, :not_found}}}}
     end

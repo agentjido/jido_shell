@@ -69,7 +69,7 @@ defmodule Jido.Shell.SessionTest do
 
   describe "start/2" do
     test "starts a session for a workspace" do
-      {:ok, session_id} = Session.start(:test_workspace)
+      {:ok, session_id} = Session.start("test_workspace")
       assert String.starts_with?(session_id, "sess-")
 
       assert {:ok, pid} = Session.lookup(session_id)
@@ -78,21 +78,41 @@ defmodule Jido.Shell.SessionTest do
 
     test "accepts custom session_id" do
       custom_id = "sess-custom-123"
-      {:ok, ^custom_id} = Session.start(:test, session_id: custom_id)
+      {:ok, ^custom_id} = Session.start("test", session_id: custom_id)
       assert {:ok, _} = Session.lookup(custom_id)
     end
 
     test "passes options to SessionServer" do
-      {:ok, session_id} = Session.start(:test, cwd: "/home", env: %{"X" => "1"})
+      {:ok, session_id} = Session.start("test", cwd: "/home", env: %{"X" => "1"})
       {:ok, state} = Jido.Shell.SessionServer.get_state(session_id)
       assert state.cwd == "/home"
       assert state.env == %{"X" => "1"}
+    end
+
+    test "rejects invalid workspace_id types" do
+      assert {:error, %Jido.Shell.Error{code: {:session, :invalid_workspace_id}}} =
+               Session.start(:test_workspace)
+    end
+
+    test "rejects empty workspace identifiers" do
+      assert {:error, %Jido.Shell.Error{code: {:session, :invalid_workspace_id}}} =
+               Session.start("   ")
+    end
+
+    test "returns supervisor child-start errors for duplicate session IDs" do
+      session_id = "sess-duplicate-#{System.unique_integer([:positive])}"
+      assert {:ok, ^session_id} = Session.start("dup_ws", session_id: session_id)
+      assert {:error, _} = Session.start("dup_ws", session_id: session_id)
+
+      on_exit(fn ->
+        _ = Session.stop(session_id)
+      end)
     end
   end
 
   describe "stop/1" do
     test "stops a running session" do
-      {:ok, session_id} = Session.start(:test)
+      {:ok, session_id} = Session.start("test")
       assert {:ok, pid} = Session.lookup(session_id)
       ref = Process.monitor(pid)
 
@@ -121,7 +141,7 @@ defmodule Jido.Shell.SessionTest do
     end
 
     test "starts a session with VFS auto-mounted" do
-      workspace_id = :"test_ws_vfs_#{System.unique_integer([:positive])}"
+      workspace_id = "test_ws_vfs_#{System.unique_integer([:positive])}"
 
       {:ok, session_id} = Session.start_with_vfs(workspace_id)
 
@@ -138,8 +158,8 @@ defmodule Jido.Shell.SessionTest do
     end
 
     test "does not re-mount if VFS already mounted" do
-      workspace_id = :"test_ws_vfs_exists_#{System.unique_integer([:positive])}"
-      fs_name = :"test_fs_#{System.unique_integer([:positive])}"
+      workspace_id = "test_ws_vfs_exists_#{System.unique_integer([:positive])}"
+      fs_name = "test_fs_#{System.unique_integer([:positive])}"
 
       start_supervised!(
         {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
@@ -156,6 +176,37 @@ defmodule Jido.Shell.SessionTest do
       on_exit(fn ->
         Jido.Shell.VFS.unmount(workspace_id, "/")
       end)
+    end
+
+    test "merges managed mount metadata with existing session metadata" do
+      workspace_id = "test_ws_meta_#{System.unique_integer([:positive])}"
+      {:ok, session_id} = Session.start_with_vfs(workspace_id, meta: %{actor: "test"})
+
+      {:ok, state} = Jido.Shell.SessionServer.get_state(session_id)
+      assert state.meta.actor == "test"
+      assert state.meta.managed_workspace_mount == true
+
+      on_exit(fn ->
+        _ = Session.stop(session_id)
+        _ = Session.teardown_workspace(workspace_id)
+      end)
+    end
+  end
+
+  describe "teardown_workspace/2" do
+    test "unmounts managed workspace resources" do
+      workspace_id = "teardown_ws_#{System.unique_integer([:positive])}"
+      fs_name = "teardown_fs_#{System.unique_integer([:positive])}"
+
+      :ok =
+        Jido.Shell.VFS.mount(workspace_id, "/data", Jido.VFS.Adapter.InMemory,
+          name: fs_name,
+          managed: true
+        )
+
+      assert length(Jido.Shell.VFS.list_mounts(workspace_id)) == 1
+      assert :ok = Session.teardown_workspace(workspace_id, managed_only: true)
+      assert [] = Jido.Shell.VFS.list_mounts(workspace_id)
     end
   end
 end

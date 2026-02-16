@@ -9,8 +9,8 @@ defmodule Jido.Shell.Command.WriteTest do
 
   setup do
     VFS.init()
-    workspace_id = :"test_ws_#{System.unique_integer([:positive])}"
-    fs_name = :"test_fs_#{System.unique_integer([:positive])}"
+    workspace_id = "test_ws_#{System.unique_integer([:positive])}"
+    fs_name = "test_fs_#{System.unique_integer([:positive])}"
 
     start_supervised!(
       {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
@@ -110,9 +110,9 @@ defmodule Jido.Shell.Command.WriteTest do
   describe "integration with session" do
     test "write creates files via session", %{workspace_id: workspace_id} do
       {:ok, session_id} = Session.start(workspace_id)
-      :ok = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
 
-      :ok = SessionServer.run_command(session_id, "write /test.txt hello world")
+      {:ok, :accepted} = SessionServer.run_command(session_id, "write /test.txt hello world")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}
       assert_receive {:jido_shell_session, ^session_id, {:output, _}}

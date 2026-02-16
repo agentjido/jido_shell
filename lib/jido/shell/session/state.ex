@@ -9,7 +9,7 @@ defmodule Jido.Shell.Session.State do
   ## Fields
 
   - `id` - Unique session identifier (string)
-  - `workspace_id` - The workspace this session belongs to (atom)
+  - `workspace_id` - The workspace this session belongs to (string)
   - `cwd` - Current working directory (defaults to "/")
   - `env` - Environment variables (map)
   - `history` - Command history (list of strings)
@@ -19,7 +19,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "sess-123", workspace_id: :my_workspace})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "sess-123", workspace_id: "my_workspace"})
       iex> state.cwd
       "/"
       iex> state.history
@@ -31,7 +31,7 @@ defmodule Jido.Shell.Session.State do
             __MODULE__,
             %{
               id: Zoi.string(),
-              workspace_id: Zoi.atom(),
+              workspace_id: Zoi.string() |> Zoi.min(1),
               cwd: Zoi.string() |> Zoi.default("/"),
               env: Zoi.map() |> Zoi.default(%{}),
               history: Zoi.array(Zoi.string()) |> Zoi.default([]),
@@ -43,6 +43,7 @@ defmodule Jido.Shell.Session.State do
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))
+  @default_history_limit 500
 
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -67,7 +68,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "sess-1", workspace_id: :test})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "sess-1", workspace_id: "test"})
       iex> state.id
       "sess-1"
 
@@ -84,9 +85,9 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> state = Jido.Shell.Session.State.new!(%{id: "sess-1", workspace_id: :test})
+      iex> state = Jido.Shell.Session.State.new!(%{id: "sess-1", workspace_id: "test"})
       iex> state.workspace_id
-      :test
+      "test"
 
   """
   @spec new!(map()) :: t()
@@ -102,7 +103,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: :w})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
       iex> state = Jido.Shell.Session.State.add_transport(state, self())
       iex> MapSet.member?(state.transports, self())
       true
@@ -118,7 +119,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: :w})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
       iex> state = Jido.Shell.Session.State.add_transport(state, self())
       iex> state = Jido.Shell.Session.State.remove_transport(state, self())
       iex> MapSet.member?(state.transports, self())
@@ -135,7 +136,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: :w})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
       iex> state = Jido.Shell.Session.State.add_to_history(state, "ls -la")
       iex> hd(state.history)
       "ls -la"
@@ -143,7 +144,8 @@ defmodule Jido.Shell.Session.State do
   """
   @spec add_to_history(t(), String.t()) :: t()
   def add_to_history(%__MODULE__{} = state, line) when is_binary(line) do
-    %{state | history: [line | state.history]}
+    history_limit = history_limit(state)
+    %{state | history: [line | state.history] |> Enum.take(history_limit)}
   end
 
   @doc """
@@ -151,7 +153,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: :w})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
       iex> state = Jido.Shell.Session.State.set_cwd(state, "/home/user")
       iex> state.cwd
       "/home/user"
@@ -167,7 +169,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: :w})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
       iex> state = Jido.Shell.Session.State.set_current_command(state, %{line: "ls", task: self()})
       iex> state.current_command.line
       "ls"
@@ -183,7 +185,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: :w})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
       iex> state = Jido.Shell.Session.State.set_current_command(state, %{line: "ls"})
       iex> state = Jido.Shell.Session.State.clear_current_command(state)
       iex> state.current_command
@@ -200,7 +202,7 @@ defmodule Jido.Shell.Session.State do
 
   ## Examples
 
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: :w})
+      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
       iex> Jido.Shell.Session.State.command_running?(state)
       false
 
@@ -208,4 +210,11 @@ defmodule Jido.Shell.Session.State do
   @spec command_running?(t()) :: boolean()
   def command_running?(%__MODULE__{current_command: nil}), do: false
   def command_running?(%__MODULE__{current_command: _}), do: true
+
+  defp history_limit(%__MODULE__{meta: meta}) do
+    case Map.get(meta, :history_limit, Map.get(meta, "history_limit", @default_history_limit)) do
+      limit when is_integer(limit) and limit > 0 -> limit
+      _ -> @default_history_limit
+    end
+  end
 end

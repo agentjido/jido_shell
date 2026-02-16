@@ -5,7 +5,7 @@ defmodule Jido.Shell.Command.PwdTest do
   alias Jido.Shell.Session.State
 
   setup do
-    {:ok, state} = State.new(%{id: "test", workspace_id: :test, cwd: "/home/user"})
+    {:ok, state} = State.new(%{id: "test", workspace_id: "test", cwd: "/home/user"})
     {:ok, state: state}
   end
 
@@ -39,7 +39,7 @@ defmodule Jido.Shell.Command.PwdTest do
     end
 
     test "emits root directory when cwd is root" do
-      {:ok, state} = State.new(%{id: "test", workspace_id: :test, cwd: "/"})
+      {:ok, state} = State.new(%{id: "test", workspace_id: "test", cwd: "/"})
       emit = fn event -> send(self(), {:emit, event}) end
 
       result = Pwd.run(state, %{args: []}, emit)

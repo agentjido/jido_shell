@@ -10,12 +10,17 @@ defmodule Jido.Shell.Sandbox.NetworkPolicy do
   - `:block_ports` (list of ports)
   """
 
+  alias Jido.Shell.Command.Parser
   alias Jido.Shell.Error
 
   @network_commands ~w(curl wget nc ncat telnet ssh scp sftp ftp ping dig nslookup)
   @url_regex ~r/https?:\/\/([A-Za-z0-9\.\-]+)(?::(\d{1,5}))?/
   @host_port_regex ~r/\b([A-Za-z0-9\.\-]+):(\d{1,5})\b/
+  @bracketed_host_port_regex ~r/\[([A-Fa-f0-9:]+)\]:(\d{1,5})/
   @port_flag_regex ~r/^--port=(\d{1,5})$/
+  @port_short_flag_regex ~r/^-p(\d{1,5})$/
+  @domain_like_regex ~r/^(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/
+  @ipv4_regex ~r/^\d{1,3}(?:\.\d{1,3}){3}$/
 
   @type policy_context :: map() | keyword()
 
@@ -24,16 +29,26 @@ defmodule Jido.Shell.Sandbox.NetworkPolicy do
   """
   @spec enforce(String.t(), policy_context()) :: :ok | {:error, Error.t()}
   def enforce(line, execution_context) when is_binary(line) do
-    case Jido.Shell.Command.Parser.parse(line) do
-      {:ok, command, args} ->
-        if network_command?(command) do
-          check_network_command(line, command, args, normalize_policy(execution_context))
-        else
-          :ok
-        end
+    case Parser.parse_program(line) do
+      {:ok, commands} ->
+        policy = normalize_policy(execution_context)
+        enforce_commands(line, commands, policy)
 
       _ ->
         :ok
+    end
+  end
+
+  defp enforce_commands(_line, [], _policy), do: :ok
+
+  defp enforce_commands(line, [%{command: command, args: args} | rest], policy) do
+    if network_command?(command) do
+      case check_network_command(line, command, args, policy) do
+        :ok -> enforce_commands(line, rest, policy)
+        {:error, _} = error -> error
+      end
+    else
+      enforce_commands(line, rest, policy)
     end
   end
 
@@ -202,11 +217,17 @@ defmodule Jido.Shell.Sandbox.NetworkPolicy do
   defp to_port(_), do: nil
 
   defp extract_endpoints(args) do
-    Enum.reduce(args, %{domains: [], ports: []}, fn arg, acc ->
+    args
+    |> Enum.with_index()
+    |> Enum.reduce(%{domains: [], ports: []}, fn {arg, idx}, acc ->
+      next_arg = Enum.at(args, idx + 1)
+
       acc
       |> extract_from_url(arg)
       |> extract_from_host_port(arg)
-      |> extract_from_port_flags(arg)
+      |> extract_from_bracketed_host_port(arg)
+      |> extract_from_port_flags(arg, next_arg)
+      |> extract_from_bare_host(arg)
     end)
     |> Map.update!(:domains, &Enum.uniq/1)
     |> Map.update!(:ports, &Enum.uniq/1)
@@ -229,11 +250,28 @@ defmodule Jido.Shell.Sandbox.NetworkPolicy do
   end
 
   defp extract_from_host_port(acc, arg) do
-    Regex.scan(@host_port_regex, arg)
+    if String.contains?(arg, "[") do
+      acc
+    else
+      Regex.scan(@host_port_regex, arg)
+      |> Enum.reduce(acc, fn
+        [_, domain, port], current ->
+          current
+          |> add_domain(domain)
+          |> maybe_add_port(port)
+
+        _other, current ->
+          current
+      end)
+    end
+  end
+
+  defp extract_from_bracketed_host_port(acc, arg) do
+    Regex.scan(@bracketed_host_port_regex, arg)
     |> Enum.reduce(acc, fn
-      [_, domain, port], current ->
+      [_, host, port], current ->
         current
-        |> add_domain(domain)
+        |> add_domain(host)
         |> maybe_add_port(port)
 
       _other, current ->
@@ -241,14 +279,61 @@ defmodule Jido.Shell.Sandbox.NetworkPolicy do
     end)
   end
 
-  defp extract_from_port_flags(acc, arg) do
+  defp extract_from_port_flags(acc, arg, next_arg) do
     cond do
       Regex.match?(@port_flag_regex, arg) ->
         [_, port] = Regex.run(@port_flag_regex, arg)
         maybe_add_port(acc, port)
 
+      Regex.match?(@port_short_flag_regex, arg) ->
+        [_, port] = Regex.run(@port_short_flag_regex, arg)
+        maybe_add_port(acc, port)
+
+      arg == "-p" ->
+        maybe_add_port(acc, next_arg)
+
       true ->
         acc
+    end
+  end
+
+  defp extract_from_bare_host(acc, arg) do
+    normalized =
+      arg
+      |> to_string()
+      |> String.trim()
+      |> String.trim_trailing(",")
+      |> String.trim_trailing(";")
+
+    cond do
+      normalized == "" or String.starts_with?(normalized, "-") ->
+        acc
+
+      String.contains?(normalized, "://") ->
+        acc
+
+      String.starts_with?(normalized, "[") ->
+        acc
+
+      true ->
+        host_part = normalized |> String.split("/", parts: 2) |> hd()
+
+        case String.split(host_part, ":", parts: 2) do
+          [host, port] when host != "" ->
+            acc
+            |> add_domain(host)
+            |> maybe_add_port(port)
+
+          [host] ->
+            if Regex.match?(@domain_like_regex, host) or Regex.match?(@ipv4_regex, host) do
+              add_domain(acc, host)
+            else
+              acc
+            end
+
+          _ ->
+            acc
+        end
     end
   end
 

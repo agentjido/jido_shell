@@ -5,7 +5,6 @@ defmodule Mix.Tasks.JidoShell do
   ## Usage
 
       mix jido_shell              # IEx-style shell
-      mix jido_shell --ui         # Rich terminal UI
       mix jido_shell --workspace my_workspace
 
   """
@@ -20,19 +19,20 @@ defmodule Mix.Tasks.JidoShell do
 
     {opts, _, _} =
       OptionParser.parse(args,
-        strict: [workspace: :string, ui: :boolean]
+        strict: [workspace: :string]
       )
 
-    workspace_id =
-      case Keyword.get(opts, :workspace) do
-        nil -> :default
-        name -> String.to_atom(name)
-      end
+    workspace_id = Keyword.get(opts, :workspace, "default")
 
-    if Keyword.get(opts, :ui) do
-      Jido.Shell.Transport.TermUI.start(workspace_id)
-    else
-      Jido.Shell.Transport.IEx.start(workspace_id)
+    case Jido.Shell.Transport.IEx.start(workspace_id) do
+      :ok ->
+        :ok
+
+      {:error, %Jido.Shell.Error{} = error} ->
+        Mix.raise("failed to start shell: #{error.message}")
+
+      {:error, reason} ->
+        Mix.raise("failed to start shell: #{inspect(reason)}")
     end
   end
 end
