@@ -9,8 +9,8 @@ defmodule Jido.Shell.Command.BashTest do
 
   setup do
     VFS.init()
-    workspace_id = :"bash_ws_#{System.unique_integer([:positive])}"
-    fs_name = :"bash_fs_#{System.unique_integer([:positive])}"
+    workspace_id = "bash_ws_#{System.unique_integer([:positive])}"
+    fs_name = "bash_fs_#{System.unique_integer([:positive])}"
 
     start_supervised!(
       {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
@@ -148,9 +148,9 @@ defmodule Jido.Shell.Command.BashTest do
   describe "integration with session" do
     test "applies script state updates to session", %{workspace_id: workspace_id} do
       {:ok, session_id} = Session.start(workspace_id)
-      :ok = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
 
-      :ok = SessionServer.run_command(session_id, "bash -c \"mkdir home; cd home\"")
+      {:ok, :accepted} = SessionServer.run_command(session_id, "bash -c \"mkdir home; cd home\"")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}
       assert_receive {:jido_shell_session, ^session_id, {:cwd_changed, "/home"}}
@@ -162,13 +162,13 @@ defmodule Jido.Shell.Command.BashTest do
 
     test "supports per-command network execution context overrides", %{workspace_id: workspace_id} do
       {:ok, session_id} = Session.start(workspace_id)
-      :ok = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
 
-      :ok = SessionServer.run_command(session_id, "bash -c \"curl https://example.com\"")
+      {:ok, :accepted} = SessionServer.run_command(session_id, "bash -c \"curl https://example.com\"")
 
       assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :network_blocked}}}}
 
-      :ok =
+      {:ok, :accepted} =
         SessionServer.run_command(
           session_id,
           "bash -c \"curl https://example.com\"",

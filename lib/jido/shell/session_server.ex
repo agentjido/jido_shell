@@ -8,6 +8,7 @@ defmodule Jido.Shell.SessionServer do
 
   use GenServer
 
+  alias Jido.Shell.Error
   alias Jido.Shell.Session
   alias Jido.Shell.Session.State
 
@@ -29,25 +30,33 @@ defmodule Jido.Shell.SessionServer do
   - `{:jido_shell_session, session_id, {:output, chunk}}`
   - `{:jido_shell_session, session_id, :command_done}`
   """
-  @spec subscribe(String.t(), pid(), keyword()) :: :ok
+  @spec subscribe(String.t(), pid(), keyword()) ::
+          {:ok, :subscribed} | {:error, Error.t()}
   def subscribe(session_id, transport_pid, opts \\ []) do
-    GenServer.call(Session.via_registry(session_id), {:subscribe, transport_pid, opts})
+    with_session(session_id, fn pid ->
+      GenServer.call(pid, {:subscribe, transport_pid, opts})
+    end)
   end
 
   @doc """
   Unsubscribes a transport from session events.
   """
-  @spec unsubscribe(String.t(), pid()) :: :ok
+  @spec unsubscribe(String.t(), pid()) ::
+          {:ok, :unsubscribed} | {:error, Error.t()}
   def unsubscribe(session_id, transport_pid) do
-    GenServer.call(Session.via_registry(session_id), {:unsubscribe, transport_pid})
+    with_session(session_id, fn pid ->
+      GenServer.call(pid, {:unsubscribe, transport_pid})
+    end)
   end
 
   @doc """
   Gets a snapshot of the current session state.
   """
-  @spec get_state(String.t()) :: {:ok, State.t()}
+  @spec get_state(String.t()) :: {:ok, State.t()} | {:error, Error.t()}
   def get_state(session_id) do
-    GenServer.call(Session.via_registry(session_id), :get_state)
+    with_session(session_id, fn pid ->
+      GenServer.call(pid, :get_state)
+    end)
   end
 
   @doc """
@@ -56,17 +65,22 @@ defmodule Jido.Shell.SessionServer do
   `opts` are passed to the command task context (for example
   `execution_context: %{network: %{allow_domains: [...]}}`).
   """
-  @spec run_command(String.t(), String.t(), keyword()) :: :ok
+  @spec run_command(String.t(), String.t(), keyword()) ::
+          {:ok, :accepted} | {:error, Error.t()}
   def run_command(session_id, line, opts \\ []) do
-    GenServer.cast(Session.via_registry(session_id), {:run_command, line, opts})
+    with_session(session_id, fn pid ->
+      GenServer.call(pid, {:run_command, line, opts})
+    end)
   end
 
   @doc """
   Cancels the currently running command.
   """
-  @spec cancel(String.t()) :: :ok
+  @spec cancel(String.t()) :: {:ok, :cancelled} | {:error, Error.t()}
   def cancel(session_id) do
-    GenServer.cast(Session.via_registry(session_id), :cancel)
+    with_session(session_id, fn pid ->
+      GenServer.call(pid, :cancel)
+    end)
   end
 
   # === Server Callbacks ===
@@ -92,13 +106,13 @@ defmodule Jido.Shell.SessionServer do
   def handle_call({:subscribe, transport_pid, _opts}, _from, state) do
     Process.monitor(transport_pid)
     new_state = State.add_transport(state, transport_pid)
-    {:reply, :ok, new_state}
+    {:reply, {:ok, :subscribed}, new_state}
   end
 
   @impl true
   def handle_call({:unsubscribe, transport_pid}, _from, state) do
     new_state = State.remove_transport(state, transport_pid)
-    {:reply, :ok, new_state}
+    {:reply, {:ok, :unsubscribed}, new_state}
   end
 
   @impl true
@@ -107,44 +121,27 @@ defmodule Jido.Shell.SessionServer do
   end
 
   @impl true
+  def handle_call({:run_command, line, opts}, _from, state) do
+    {reply, new_state} = do_run_command(state, line, opts)
+    {:reply, reply, new_state}
+  end
+
+  @impl true
+  def handle_call(:cancel, _from, state) do
+    {reply, new_state} = do_cancel(state)
+    {:reply, reply, new_state}
+  end
+
+  @impl true
   def handle_cast({:run_command, line, opts}, state) do
-    if State.command_running?(state) do
-      broadcast(state, {:error, Jido.Shell.Error.shell(:busy)})
-      {:noreply, state}
-    else
-      session_pid = self()
-
-      {:ok, task_pid} =
-        Task.Supervisor.start_child(
-          Jido.Shell.CommandTaskSupervisor,
-          fn -> Jido.Shell.CommandRunner.run(session_pid, state, line, opts) end
-        )
-
-      ref = Process.monitor(task_pid)
-
-      new_state =
-        state
-        |> State.add_to_history(line)
-        |> State.set_current_command(%{task: task_pid, ref: ref, line: line})
-
-      broadcast(new_state, {:command_started, line})
-      {:noreply, new_state}
-    end
+    {_reply, new_state} = do_run_command(state, line, opts)
+    {:noreply, new_state}
   end
 
   @impl true
   def handle_cast(:cancel, state) do
-    case state.current_command do
-      nil ->
-        {:noreply, state}
-
-      %{task: task_pid, ref: ref} ->
-        Process.demonitor(ref, [:flush])
-        Process.exit(task_pid, :shutdown)
-
-        broadcast(state, :command_cancelled)
-        {:noreply, State.clear_current_command(state)}
-    end
+    {_reply, new_state} = do_cancel(state)
+    {:noreply, new_state}
   end
 
   @impl true
@@ -235,5 +232,67 @@ defmodule Jido.Shell.SessionServer do
     for pid <- state.transports do
       send(pid, {:jido_shell_session, state.id, event})
     end
+  end
+
+  defp do_run_command(state, line, opts) do
+    if State.command_running?(state) do
+      error = Error.shell(:busy)
+      broadcast(state, {:error, error})
+      {{:error, error}, state}
+    else
+      session_pid = self()
+
+      case Task.Supervisor.start_child(
+             Jido.Shell.CommandTaskSupervisor,
+             fn -> Jido.Shell.CommandRunner.run(session_pid, state, line, opts) end
+           ) do
+        {:ok, task_pid} ->
+          ref = Process.monitor(task_pid)
+
+          new_state =
+            state
+            |> State.add_to_history(line)
+            |> State.set_current_command(%{task: task_pid, ref: ref, line: line})
+
+          broadcast(new_state, {:command_started, line})
+          {{:ok, :accepted}, new_state}
+
+        {:error, reason} ->
+          {{:error, Error.command(:start_failed, %{reason: reason, line: line})}, state}
+      end
+    end
+  end
+
+  defp do_cancel(state) do
+    case state.current_command do
+      nil ->
+        error = Error.session(:invalid_state_transition, %{state: :idle, action: :cancel})
+        {{:error, error}, state}
+
+      %{task: task_pid, ref: ref} ->
+        Process.demonitor(ref, [:flush])
+        Process.exit(task_pid, :shutdown)
+
+        broadcast(state, :command_cancelled)
+        {{:ok, :cancelled}, State.clear_current_command(state)}
+    end
+  end
+
+  defp with_session(session_id, fun) when is_binary(session_id) and byte_size(session_id) > 0 do
+    case Session.lookup(session_id) do
+      {:ok, pid} ->
+        try do
+          fun.(pid)
+        catch
+          :exit, _ -> {:error, Error.session(:not_found, %{session_id: session_id})}
+        end
+
+      {:error, :not_found} ->
+        {:error, Error.session(:not_found, %{session_id: session_id})}
+    end
+  end
+
+  defp with_session(session_id, _fun) do
+    {:error, Error.session(:invalid_session_id, %{session_id: session_id})}
   end
 end

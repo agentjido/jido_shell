@@ -5,7 +5,7 @@ defmodule Jido.Shell.Command.HelpTest do
   alias Jido.Shell.Command.Help
 
   setup do
-    {:ok, state} = State.new(%{id: "test", workspace_id: :test})
+    {:ok, state} = State.new(%{id: "test", workspace_id: "test"})
     {:ok, state: state}
   end
 

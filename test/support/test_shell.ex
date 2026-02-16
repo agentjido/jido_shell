@@ -48,7 +48,7 @@ defmodule Jido.Shell.TestShell do
 
   @type t :: %__MODULE__{
           session_id: String.t(),
-          workspace_id: atom(),
+          workspace_id: String.t(),
           owner: pid()
         }
 
@@ -63,12 +63,12 @@ defmodule Jido.Shell.TestShell do
   def start!(opts \\ []) do
     workspace_id =
       Keyword.get_lazy(opts, :workspace_id, fn ->
-        :"test_shell_#{System.unique_integer([:positive])}"
+        "test_shell_#{System.unique_integer([:positive])}"
       end)
 
     # Setup VFS
     VFS.init()
-    fs_name = :"test_fs_#{System.unique_integer([:positive])}"
+    fs_name = "test_fs_#{System.unique_integer([:positive])}"
     :ok = VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
     # Create session
@@ -133,7 +133,10 @@ defmodule Jido.Shell.TestShell do
   """
   @spec cwd(t()) :: String.t()
   def cwd(%__MODULE__{session_id: session_id}) do
-    Agent.cwd(session_id)
+    case Agent.cwd(session_id) do
+      {:ok, cwd} -> cwd
+      {:error, reason} -> raise "Failed to get cwd: #{inspect(reason)}"
+    end
   end
 
   @doc """
@@ -216,33 +219,45 @@ defmodule Jido.Shell.TestShell do
 
   Useful for testing event streaming.
   """
-  @spec subscribe(t()) :: :ok
+  @spec subscribe(t()) :: :ok | {:error, term()}
   def subscribe(%__MODULE__{session_id: session_id}) do
-    SessionServer.subscribe(session_id, self())
+    case SessionServer.subscribe(session_id, self()) do
+      {:ok, :subscribed} -> :ok
+      {:error, _} = error -> error
+    end
   end
 
   @doc """
   Unsubscribes from session events.
   """
-  @spec unsubscribe(t()) :: :ok
+  @spec unsubscribe(t()) :: :ok | {:error, term()}
   def unsubscribe(%__MODULE__{session_id: session_id}) do
-    SessionServer.unsubscribe(session_id, self())
+    case SessionServer.unsubscribe(session_id, self()) do
+      {:ok, :unsubscribed} -> :ok
+      {:error, _} = error -> error
+    end
   end
 
   @doc """
   Runs a command asynchronously, useful for testing cancellation.
   """
-  @spec run_async(t(), String.t()) :: :ok
+  @spec run_async(t(), String.t()) :: :ok | {:error, term()}
   def run_async(%__MODULE__{session_id: session_id}, command) do
-    SessionServer.run_command(session_id, command)
+    case SessionServer.run_command(session_id, command) do
+      {:ok, :accepted} -> :ok
+      {:error, _} = error -> error
+    end
   end
 
   @doc """
   Cancels the currently running command.
   """
-  @spec cancel(t()) :: :ok
+  @spec cancel(t()) :: :ok | {:error, term()}
   def cancel(%__MODULE__{session_id: session_id}) do
-    SessionServer.cancel(session_id)
+    case SessionServer.cancel(session_id) do
+      {:ok, :cancelled} -> :ok
+      {:error, _} = error -> error
+    end
   end
 
   @doc """

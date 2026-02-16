@@ -16,8 +16,8 @@ defmodule Jido.Shell.Sandbox.Bash do
   @doc """
   Executes a script in the current session context.
 
-  Script lines are split on newlines and `;`, with blank lines and full-line
-  comments (`# ...`) ignored.
+  Script lines are split on newlines, with blank lines and full-line comments
+  (`# ...`) ignored.
   """
   @spec execute(State.t(), String.t(), Jido.Shell.Command.emit()) :: execute_result()
   def execute(%State{} = state, script, emit) when is_binary(script) do
@@ -33,7 +33,6 @@ defmodule Jido.Shell.Sandbox.Bash do
   def statements(script) when is_binary(script) do
     script
     |> String.split(~r/\r?\n/)
-    |> Enum.flat_map(&String.split(&1, ";"))
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&skip_statement?/1)
   end

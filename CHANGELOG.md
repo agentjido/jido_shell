@@ -5,28 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Hardened identifier model to use binary workspace IDs across public APIs.
+- Removed runtime-generated atom usage from session/VFS workflows.
+- Updated `SessionServer` and `Agent` APIs to return explicit structured errors for missing sessions and invalid identifiers instead of crashing callers.
+- Added deterministic mount lifecycle behavior:
+  - duplicate mount path rejection,
+  - typed mount startup failures,
+  - owned filesystem process termination on unmount/workspace teardown.
+- Added workspace teardown API wiring for deterministic resource cleanup.
+- Upgraded command parsing to support quote/escape-aware tokenization and top-level chaining (`;`, `&&`).
+- Hardened `sleep` and `seq` argument parsing to return validation errors for invalid numerics.
+- Expanded sandbox network policy endpoint handling and chaining-aware enforcement.
+- Added optional per-command runtime/output limits in execution context.
+- Removed the alternate rich UI mode from the V1 public release surface and CLI flags.
+- Updated docs and examples to current names/event tuples and current package surface.
+
+### Added
+- `MIGRATION.md` documenting V1-facing breaking API changes and upgrade steps.
+- New hardening tests for:
+  - workspace identifier validation and atom leak regression,
+  - session API resilience/error shaping,
+  - mount lifecycle/cleanup behavior,
+  - parser/chaining behavior and syntax errors,
+  - command numeric validation,
+  - network policy edge cases,
+  - transport and helper branch behavior.
+- CI coverage job with enforced coverage gate.
+
 ## [3.0.0] - 2024-12-23
 
 ### Added
-- Complete v3 reimplementation from scratch
-- `Jido.Shell.Session` - Session management with Registry and DynamicSupervisor
-- `Jido.Shell.SessionServer` - GenServer per session with state and subscriptions
-- `Jido.Shell.Command` behaviour - Unified command interface with streaming support
-- `Jido.Shell.CommandRunner` - Task-based command execution
-- `Jido.Shell.VFS` - Virtual filesystem with Hako adapters and mount table
-- `Jido.Shell.Agent` - Agent-friendly programmatic API
-- `Jido.Shell.Transport.IEx` - Interactive IEx shell transport
-- `Jido.Shell.Transport.TermUI` - Rich terminal UI transport
-- Built-in commands: echo, pwd, cd, ls, cat, write, mkdir, rm, cp, env, help, sleep, seq
-- `mix kodo` task for easy shell access
-- Zoi schema validation for command arguments
-- Structured errors with `Jido.Shell.Error`
-- Session events protocol for streaming output
-- Command cancellation support
+- Complete v3 reimplementation from scratch.
+- `Jido.Shell.Session`, `Jido.Shell.SessionServer`, `Jido.Shell.Command`, `Jido.Shell.CommandRunner`, `Jido.Shell.VFS`, `Jido.Shell.Agent`, `Jido.Shell.Transport.IEx`.
+- Built-in commands: `echo`, `pwd`, `cd`, `ls`, `cat`, `write`, `mkdir`, `rm`, `cp`, `env`, `help`, `sleep`, `seq`.
+- Structured shell errors and session event protocol.
 
 ### Changed
-- Complete architecture redesign for streaming and agent integration
-- GenServer-based sessions replace stateless execution
+- Architecture redesign for streaming and agent integration.
 
 ### Removed
-- Legacy v2 implementation
+- Legacy v2 implementation.

@@ -7,8 +7,8 @@ defmodule Jido.Shell.Sandbox.BashTest do
 
   setup do
     VFS.init()
-    workspace_id = :"sandbox_ws_#{System.unique_integer([:positive])}"
-    fs_name = :"sandbox_fs_#{System.unique_integer([:positive])}"
+    workspace_id = "sandbox_ws_#{System.unique_integer([:positive])}"
+    fs_name = "sandbox_fs_#{System.unique_integer([:positive])}"
 
     start_supervised!(
       {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
@@ -26,7 +26,7 @@ defmodule Jido.Shell.Sandbox.BashTest do
   end
 
   describe "statements/1" do
-    test "splits lines and semicolons and removes comments" do
+    test "splits lines and removes comments" do
       script = """
       # comment
       echo one; echo two
@@ -34,7 +34,12 @@ defmodule Jido.Shell.Sandbox.BashTest do
       pwd
       """
 
-      assert Bash.statements(script) == ["echo one", "echo two", "pwd"]
+      assert Bash.statements(script) == ["echo one; echo two", "pwd"]
+    end
+
+    test "preserves quoted semicolons in a statement" do
+      script = ~s(echo "a;b"; echo c)
+      assert Bash.statements(script) == [~s(echo "a;b"; echo c)]
     end
   end
 

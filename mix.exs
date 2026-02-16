@@ -18,7 +18,8 @@ defmodule Jido.Shell.MixProject do
       # Test Coverage
       test_coverage: [
         tool: ExCoveralls,
-        summary: [threshold: 90]
+        summary: [threshold: 90],
+        coverage_options: [minimum_coverage: 90]
       ],
 
       # Dialyzer
@@ -46,8 +47,10 @@ defmodule Jido.Shell.MixProject do
     [
       preferred_envs: [
         coveralls: :test,
+        "coveralls.detail": :test,
         "coveralls.github": :test,
-        "coveralls.html": :test
+        "coveralls.html": :test,
+        "coveralls.json": :test
       ]
     ]
   end
@@ -101,7 +104,8 @@ defmodule Jido.Shell.MixProject do
 
   defp package do
     [
-      files: ~w(lib mix.exs LICENSE README.md CHANGELOG.md CONTRIBUTING.md AGENTS.md usage-rules.md .formatter.exs),
+      files:
+        ~w(lib mix.exs LICENSE README.md MIGRATION.md CHANGELOG.md CONTRIBUTING.md AGENTS.md usage-rules.md .formatter.exs),
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -120,8 +124,10 @@ defmodule Jido.Shell.MixProject do
       source_ref: "v#{@version}",
       extras: [
         {"README.md", title: "Overview"},
+        "MIGRATION.md",
         "CHANGELOG.md",
-        "CONTRIBUTING.md"
+        "CONTRIBUTING.md",
+        "LICENSE"
       ],
       groups_for_modules: [
         Core: [
@@ -138,8 +144,7 @@ defmodule Jido.Shell.MixProject do
           Jido.Shell.VFS.MountTable
         ],
         Transports: [
-          Jido.Shell.Transport.IEx,
-          Jido.Shell.Transport.TermUI
+          Jido.Shell.Transport.IEx
         ],
         Internals: [
           Jido.Shell.CommandRunner,

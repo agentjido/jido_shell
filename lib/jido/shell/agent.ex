@@ -8,7 +8,7 @@ defmodule Jido.Shell.Agent do
   ## Usage
 
       # Start a session
-      {:ok, session} = Jido.Shell.Agent.new(:my_workspace)
+      {:ok, session} = Jido.Shell.Agent.new("my_workspace")
 
       # Run commands synchronously
       {:ok, output} = Jido.Shell.Agent.run(session, "ls")
@@ -27,6 +27,7 @@ defmodule Jido.Shell.Agent do
   alias Jido.Shell.SessionServer
 
   @type session :: String.t()
+  @type workspace_id :: String.t()
   @type result :: {:ok, String.t()} | {:error, Jido.Shell.Error.t()}
 
   @doc """
@@ -34,9 +35,15 @@ defmodule Jido.Shell.Agent do
 
   Returns the session ID which can be used for subsequent operations.
   """
-  @spec new(atom(), keyword()) :: {:ok, session()} | {:error, term()}
-  def new(workspace_id, opts \\ []) when is_atom(workspace_id) do
+  @spec new(workspace_id() | term(), keyword()) :: {:ok, session()} | {:error, term()}
+  def new(workspace_id, opts \\ [])
+
+  def new(workspace_id, opts) when is_binary(workspace_id) do
     Session.start_with_vfs(workspace_id, opts)
+  end
+
+  def new(workspace_id, _opts) do
+    {:error, Jido.Shell.Error.session(:invalid_workspace_id, %{workspace_id: workspace_id})}
   end
 
   @doc """
@@ -54,13 +61,22 @@ defmodule Jido.Shell.Agent do
     timeout = Keyword.get(opts, :timeout, 30_000)
     command_opts = Keyword.drop(opts, [:timeout])
 
-    :ok = SessionServer.subscribe(session_id, self())
-    :ok = SessionServer.run_command(session_id, command, command_opts)
+    case SessionServer.subscribe(session_id, self()) do
+      {:ok, :subscribed} ->
+        drain_session_events(session_id)
 
-    result = collect_output(session_id, [], timeout)
-    :ok = SessionServer.unsubscribe(session_id, self())
+        result =
+          case SessionServer.run_command(session_id, command, command_opts) do
+            {:ok, :accepted} -> collect_output(session_id, [], timeout, false)
+            {:error, _} = error -> error
+          end
 
-    result
+        _ = SessionServer.unsubscribe(session_id, self())
+        result
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   @doc """
@@ -78,9 +94,10 @@ defmodule Jido.Shell.Agent do
   """
   @spec read_file(session(), String.t()) :: {:ok, binary()} | {:error, Jido.Shell.Error.t()}
   def read_file(session_id, path) do
-    {:ok, state} = SessionServer.get_state(session_id)
-    full_path = resolve_path(state.cwd, path)
-    Jido.Shell.VFS.read_file(state.workspace_id, full_path)
+    with {:ok, state} <- SessionServer.get_state(session_id) do
+      full_path = resolve_path(state.cwd, path)
+      Jido.Shell.VFS.read_file(state.workspace_id, full_path)
+    end
   end
 
   @doc """
@@ -88,9 +105,10 @@ defmodule Jido.Shell.Agent do
   """
   @spec write_file(session(), String.t(), binary()) :: :ok | {:error, Jido.Shell.Error.t()}
   def write_file(session_id, path, content) do
-    {:ok, state} = SessionServer.get_state(session_id)
-    full_path = resolve_path(state.cwd, path)
-    Jido.Shell.VFS.write_file(state.workspace_id, full_path, content)
+    with {:ok, state} <- SessionServer.get_state(session_id) do
+      full_path = resolve_path(state.cwd, path)
+      Jido.Shell.VFS.write_file(state.workspace_id, full_path, content)
+    end
   end
 
   @doc """
@@ -98,9 +116,10 @@ defmodule Jido.Shell.Agent do
   """
   @spec list_dir(session(), String.t()) :: {:ok, [map()]} | {:error, Jido.Shell.Error.t()}
   def list_dir(session_id, path \\ ".") do
-    {:ok, state} = SessionServer.get_state(session_id)
-    full_path = resolve_path(state.cwd, path)
-    Jido.Shell.VFS.list_dir(state.workspace_id, full_path)
+    with {:ok, state} <- SessionServer.get_state(session_id) do
+      full_path = resolve_path(state.cwd, path)
+      Jido.Shell.VFS.list_dir(state.workspace_id, full_path)
+    end
   end
 
   @doc """
@@ -114,10 +133,11 @@ defmodule Jido.Shell.Agent do
   @doc """
   Gets the current working directory.
   """
-  @spec cwd(session()) :: String.t()
+  @spec cwd(session()) :: {:ok, String.t()} | {:error, Jido.Shell.Error.t()}
   def cwd(session_id) do
-    {:ok, state} = state(session_id)
-    state.cwd
+    with {:ok, state} <- state(session_id) do
+      {:ok, state.cwd}
+    end
   end
 
   @doc """
@@ -130,16 +150,19 @@ defmodule Jido.Shell.Agent do
 
   # === Private ===
 
-  defp collect_output(session_id, acc, timeout) do
+  defp collect_output(session_id, acc, timeout, started?) do
     receive do
       {:jido_shell_session, ^session_id, {:command_started, _}} ->
-        collect_output(session_id, acc, timeout)
+        collect_output(session_id, acc, timeout, true)
+
+      {:jido_shell_session, ^session_id, _event} when not started? ->
+        collect_output(session_id, acc, timeout, started?)
 
       {:jido_shell_session, ^session_id, {:output, chunk}} ->
-        collect_output(session_id, [chunk | acc], timeout)
+        collect_output(session_id, [chunk | acc], timeout, started?)
 
       {:jido_shell_session, ^session_id, {:cwd_changed, _}} ->
-        collect_output(session_id, acc, timeout)
+        collect_output(session_id, acc, timeout, started?)
 
       {:jido_shell_session, ^session_id, :command_done} ->
         output = acc |> Enum.reverse() |> Enum.join()
@@ -156,6 +179,16 @@ defmodule Jido.Shell.Agent do
     after
       timeout ->
         {:error, Jido.Shell.Error.command(:timeout)}
+    end
+  end
+
+  defp drain_session_events(session_id) do
+    receive do
+      {:jido_shell_session, ^session_id, _event} ->
+        drain_session_events(session_id)
+    after
+      0 ->
+        :ok
     end
   end
 

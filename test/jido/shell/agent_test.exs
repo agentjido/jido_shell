@@ -1,6 +1,8 @@
 defmodule Jido.Shell.AgentTest do
   use Jido.Shell.Case, async: false
 
+  import Mimic
+
   alias Jido.Shell.Agent
   alias Jido.Shell.VFS
 
@@ -26,8 +28,8 @@ defmodule Jido.Shell.AgentTest do
 
   setup do
     VFS.init()
-    workspace_id = :"agent_test_#{System.unique_integer([:positive])}"
-    fs_name = :"agent_fs_#{System.unique_integer([:positive])}"
+    workspace_id = "agent_test_#{System.unique_integer([:positive])}"
+    fs_name = "agent_fs_#{System.unique_integer([:positive])}"
 
     start_supervised!(
       {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
@@ -98,6 +100,45 @@ defmodule Jido.Shell.AgentTest do
         )
 
       assert error.code == {:shell, :unknown_command}
+    end
+
+    test "returns typed errors when session cannot be subscribed" do
+      assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
+               Agent.run("missing-session", "echo hi")
+    end
+
+    test "returns cancellation errors when session command is cancelled", %{session_id: session_id} do
+      {:ok, :subscribed} = Jido.Shell.SessionServer.subscribe(session_id, self())
+
+      task =
+        Task.async(fn ->
+          Agent.run(session_id, "sleep 5", timeout: 10_000)
+        end)
+
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 5"}}
+      assert {:ok, :cancelled} = Jido.Shell.SessionServer.cancel(session_id)
+
+      assert {:error, %Jido.Shell.Error{code: {:command, :cancelled}}} = Task.await(task, 2_000)
+    end
+
+    test "returns crash errors when a command crashes", %{session_id: session_id} do
+      {:ok, :subscribed} = Jido.Shell.SessionServer.subscribe(session_id, self())
+
+      task =
+        Task.async(fn ->
+          Agent.run(session_id, "sleep 1", timeout: 10_000)
+        end)
+
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 1"}}
+
+      send(task.pid, {:jido_shell_session, session_id, {:command_crashed, :boom}})
+
+      assert {:error, %Jido.Shell.Error{code: {:command, :crashed}}} = Task.await(task, 2_000)
+    end
+
+    test "returns timeout errors when no completion event is received in time", %{session_id: session_id} do
+      assert {:error, %Jido.Shell.Error{code: {:command, :timeout}}} =
+               Agent.run(session_id, "sleep 1", timeout: 10)
     end
   end
 
@@ -199,13 +240,13 @@ defmodule Jido.Shell.AgentTest do
     end
 
     test "cwd returns current directory", %{session_id: session_id} do
-      assert Agent.cwd(session_id) == "/"
+      assert {:ok, "/"} = Agent.cwd(session_id)
     end
 
     test "cwd changes after cd command", %{session_id: session_id} do
       {:ok, _} = Agent.run(session_id, "mkdir /testdir")
       {:ok, _} = Agent.run(session_id, "cd /testdir")
-      assert Agent.cwd(session_id) == "/testdir"
+      assert {:ok, "/testdir"} = Agent.cwd(session_id)
     end
   end
 
@@ -264,6 +305,33 @@ defmodule Jido.Shell.AgentTest do
       {:ok, _} = Agent.run(session_id, "rm /delete_me.txt")
       {:error, error} = Agent.read_file(session_id, "/delete_me.txt")
       assert error.code == {:vfs, :not_found}
+    end
+  end
+
+  describe "run/3 mailbox ordering" do
+    setup :set_mimic_global
+    setup :verify_on_exit!
+
+    test "ignores pre-start session events until command_started arrives" do
+      session_id = "mock_session_#{System.unique_integer([:positive])}"
+      copy(Jido.Shell.SessionServer)
+
+      expect(Jido.Shell.SessionServer, :subscribe, fn ^session_id, pid when pid == self() ->
+        {:ok, :subscribed}
+      end)
+
+      expect(Jido.Shell.SessionServer, :run_command, fn ^session_id, "echo hi", [] ->
+        send(self(), {:jido_shell_session, session_id, {:output, "stale\n"}})
+        send(self(), {:jido_shell_session, session_id, {:command_started, "echo hi"}})
+        send(self(), {:jido_shell_session, session_id, :command_done})
+        {:ok, :accepted}
+      end)
+
+      expect(Jido.Shell.SessionServer, :unsubscribe, fn ^session_id, pid when pid == self() ->
+        {:ok, :unsubscribed}
+      end)
+
+      assert {:ok, ""} = Agent.run(session_id, "echo hi")
     end
   end
 end

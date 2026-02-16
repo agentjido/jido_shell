@@ -7,7 +7,7 @@ defmodule Jido.Shell.Transport.IEx do
 
   ## Usage
 
-      iex> Jido.Shell.Transport.IEx.start(:my_workspace)
+      iex> Jido.Shell.Transport.IEx.start("my_workspace")
       # Enters interactive shell mode
       /home> ls
       file1.txt
@@ -30,38 +30,36 @@ defmodule Jido.Shell.Transport.IEx do
 
   This function blocks and runs the REPL until the user exits.
   """
-  @spec start(atom(), keyword()) :: :ok
-  def start(workspace_id, opts \\ []) when is_atom(workspace_id) do
-    session_id =
-      Keyword.get_lazy(opts, :session_id, fn ->
-        case Session.start_with_vfs(workspace_id, opts) do
-          {:ok, id} -> id
-          {:error, reason} -> raise "Failed to start session: #{inspect(reason)}"
-        end
-      end)
+  @spec start(String.t(), keyword()) :: :ok | {:error, Jido.Shell.Error.t() | term()}
+  def start(workspace_id, opts \\ []) when is_binary(workspace_id) do
+    session_result =
+      case Keyword.get(opts, :session_id) do
+        nil -> Session.start_with_vfs(workspace_id, opts)
+        session_id -> {:ok, session_id}
+      end
 
-    :ok = SessionServer.subscribe(session_id, self())
+    with {:ok, session_id} <- session_result,
+         {:ok, :subscribed} <- SessionServer.subscribe(session_id, self()),
+         {:ok, initial_state} <- SessionServer.get_state(session_id) do
+      IO.puts("Jido.Shell v#{Jido.Shell.version()}")
+      IO.puts("Type \"exit\" to quit, \"help\" for commands.\n")
 
-    {:ok, initial_state} = SessionServer.get_state(session_id)
-
-    IO.puts("Jido.Shell v#{Jido.Shell.version()}")
-    IO.puts("Type \"exit\" to quit, \"help\" for commands.\n")
-
-    loop(session_id, initial_state.cwd)
+      loop(session_id, initial_state.cwd, opts)
+    end
   end
 
   @doc """
   Attaches to an existing session.
   """
-  @spec attach(String.t()) :: :ok | {:error, :not_found}
-  def attach(session_id) do
+  @spec attach(String.t(), keyword()) :: :ok | {:error, Jido.Shell.Error.t() | :not_found}
+  def attach(session_id, opts \\ []) do
     case Session.lookup(session_id) do
       {:ok, _pid} ->
-        :ok = SessionServer.subscribe(session_id, self())
-        {:ok, state} = SessionServer.get_state(session_id)
-
-        IO.puts("Attached to session #{session_id}")
-        loop(session_id, state.cwd)
+        with {:ok, :subscribed} <- SessionServer.subscribe(session_id, self()),
+             {:ok, state} <- SessionServer.get_state(session_id) do
+          IO.puts("Attached to session #{session_id}")
+          loop(session_id, state.cwd, opts)
+        end
 
       {:error, :not_found} = error ->
         error
@@ -70,10 +68,11 @@ defmodule Jido.Shell.Transport.IEx do
 
   # === Private ===
 
-  defp loop(session_id, cwd) do
+  defp loop(session_id, cwd, opts) do
     prompt = format_prompt(cwd)
+    timeout = wait_timeout(opts)
 
-    case IO.gets(prompt) do
+    case read_line(prompt, opts) do
       :eof ->
         IO.puts("\nGoodbye!")
         :ok
@@ -85,9 +84,9 @@ defmodule Jido.Shell.Transport.IEx do
       line when is_binary(line) ->
         line = String.trim(line)
 
-        case handle_input(session_id, line, cwd) do
+        case handle_input(session_id, line, cwd, timeout) do
           {:continue, new_cwd} ->
-            loop(session_id, new_cwd)
+            loop(session_id, new_cwd, opts)
 
           :exit ->
             IO.puts("Goodbye!")
@@ -96,31 +95,37 @@ defmodule Jido.Shell.Transport.IEx do
     end
   end
 
-  defp handle_input(_session_id, "", cwd), do: {:continue, cwd}
-  defp handle_input(_session_id, "exit", _cwd), do: :exit
-  defp handle_input(_session_id, "quit", _cwd), do: :exit
+  defp handle_input(_session_id, "", cwd, _timeout), do: {:continue, cwd}
+  defp handle_input(_session_id, "exit", _cwd, _timeout), do: :exit
+  defp handle_input(_session_id, "quit", _cwd, _timeout), do: :exit
 
-  defp handle_input(session_id, line, cwd) do
-    :ok = SessionServer.run_command(session_id, line)
-    new_cwd = wait_for_completion(session_id, cwd)
-    {:continue, new_cwd}
+  defp handle_input(session_id, line, cwd, timeout_ms) do
+    case SessionServer.run_command(session_id, line) do
+      {:ok, :accepted} ->
+        new_cwd = wait_for_completion(session_id, cwd, timeout_ms)
+        {:continue, new_cwd}
+
+      {:error, error} ->
+        print_error(error)
+        {:continue, cwd}
+    end
   end
 
-  defp wait_for_completion(session_id, cwd) do
+  defp wait_for_completion(session_id, cwd, timeout_ms) do
     receive do
       {:jido_shell_session, ^session_id, {:command_started, _line}} ->
-        wait_for_completion(session_id, cwd)
+        wait_for_completion(session_id, cwd, timeout_ms)
 
       {:jido_shell_session, ^session_id, {:output, chunk}} ->
         IO.write(chunk)
-        wait_for_completion(session_id, cwd)
+        wait_for_completion(session_id, cwd, timeout_ms)
 
       {:jido_shell_session, ^session_id, {:error, error}} ->
         print_error(error)
         cwd
 
       {:jido_shell_session, ^session_id, {:cwd_changed, new_cwd}} ->
-        wait_for_completion(session_id, new_cwd)
+        wait_for_completion(session_id, new_cwd, timeout_ms)
 
       {:jido_shell_session, ^session_id, :command_done} ->
         cwd
@@ -133,9 +138,23 @@ defmodule Jido.Shell.Transport.IEx do
         IO.puts("#{@error_color}Command crashed: #{inspect(reason)}#{@reset}")
         cwd
     after
-      60_000 ->
+      timeout_ms ->
         IO.puts("#{@error_color}Timeout waiting for command#{@reset}")
         cwd
+    end
+  end
+
+  defp read_line(prompt, opts) do
+    case Keyword.get(opts, :line_reader) do
+      reader when is_function(reader, 1) -> reader.(prompt)
+      _ -> IO.gets(prompt)
+    end
+  end
+
+  defp wait_timeout(opts) do
+    case Keyword.get(opts, :wait_timeout_ms, 60_000) do
+      timeout when is_integer(timeout) and timeout > 0 -> timeout
+      _ -> 60_000
     end
   end
 

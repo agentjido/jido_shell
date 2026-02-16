@@ -8,18 +8,19 @@ defmodule Jido.Shell.VFS do
   ## Example
 
       # Mount an in-memory filesystem at root
-      :ok = Jido.Shell.VFS.mount(:my_workspace, "/", Jido.VFS.Adapter.InMemory, [name: :my_fs])
+      :ok = Jido.Shell.VFS.mount("my_workspace", "/", Jido.VFS.Adapter.InMemory, [name: "my_fs"])
 
       # Write a file
-      :ok = Jido.Shell.VFS.write_file(:my_workspace, "/hello.txt", "Hello!")
+      :ok = Jido.Shell.VFS.write_file("my_workspace", "/hello.txt", "Hello!")
 
       # Read it back
-      {:ok, "Hello!"} = Jido.Shell.VFS.read_file(:my_workspace, "/hello.txt")
+      {:ok, "Hello!"} = Jido.Shell.VFS.read_file("my_workspace", "/hello.txt")
   """
 
+  alias Jido.Shell.Error
   alias Jido.Shell.VFS.MountTable
 
-  @type workspace_id :: atom()
+  @type workspace_id :: String.t()
   @type path :: String.t()
 
   @doc """
@@ -34,17 +35,44 @@ defmodule Jido.Shell.VFS do
   @doc """
   Mounts a Jido.VFS adapter at the given path.
   """
-  @spec mount(workspace_id(), path(), module(), keyword()) :: :ok | {:error, term()}
+  @spec mount(workspace_id(), path(), module(), keyword()) :: :ok | {:error, Error.t()}
   def mount(workspace_id, mount_path, adapter, opts \\ []) do
-    MountTable.mount(workspace_id, mount_path, adapter, opts)
+    with :ok <- validate_workspace_id(workspace_id) do
+      case MountTable.mount(workspace_id, mount_path, adapter, opts) do
+        :ok ->
+          :ok
+
+        {:error, :path_already_mounted} ->
+          {:error, Error.vfs(:already_exists, mount_path, %{workspace_id: workspace_id})}
+
+        {:error, reason} ->
+          {:error, Error.vfs(:mount_failed, mount_path, %{workspace_id: workspace_id, reason: reason})}
+      end
+    end
   end
 
   @doc """
   Unmounts a filesystem at the given path.
   """
-  @spec unmount(workspace_id(), path()) :: :ok | {:error, :not_found}
+  @spec unmount(workspace_id(), path()) :: :ok | {:error, Error.t()}
   def unmount(workspace_id, mount_path) do
-    MountTable.unmount(workspace_id, mount_path)
+    with :ok <- validate_workspace_id(workspace_id) do
+      case MountTable.unmount(workspace_id, mount_path) do
+        :ok -> :ok
+        {:error, :not_found} -> {:error, Error.vfs(:not_found, mount_path, %{workspace_id: workspace_id})}
+      end
+    end
+  end
+
+  @doc """
+  Unmounts all mounts for a workspace.
+  """
+  @spec unmount_workspace(workspace_id(), keyword()) :: :ok | {:error, Error.t()}
+  def unmount_workspace(workspace_id, opts \\ []) do
+    with :ok <- validate_workspace_id(workspace_id) do
+      :ok = MountTable.unmount_workspace(workspace_id, opts)
+      :ok
+    end
   end
 
   @doc """
@@ -52,7 +80,11 @@ defmodule Jido.Shell.VFS do
   """
   @spec list_mounts(workspace_id()) :: [Jido.Shell.VFS.Mount.t()]
   def list_mounts(workspace_id) do
-    MountTable.list(workspace_id)
+    if valid_workspace_id?(workspace_id) do
+      MountTable.list(workspace_id)
+    else
+      []
+    end
   end
 
   # === File Operations ===
@@ -62,7 +94,8 @@ defmodule Jido.Shell.VFS do
   """
   @spec read_file(workspace_id(), path()) :: {:ok, binary()} | {:error, Jido.Shell.Error.t()}
   def read_file(workspace_id, path) do
-    with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
+    with :ok <- validate_workspace_id(workspace_id),
+         {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
       case Jido.VFS.read(mount.filesystem, relative_path) do
         {:ok, _} = result -> result
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
@@ -75,7 +108,8 @@ defmodule Jido.Shell.VFS do
   """
   @spec write_file(workspace_id(), path(), binary()) :: :ok | {:error, Jido.Shell.Error.t()}
   def write_file(workspace_id, path, content) do
-    with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
+    with :ok <- validate_workspace_id(workspace_id),
+         {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
       case Jido.VFS.write(mount.filesystem, relative_path, content) do
         :ok -> :ok
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
@@ -88,7 +122,8 @@ defmodule Jido.Shell.VFS do
   """
   @spec delete(workspace_id(), path()) :: :ok | {:error, Jido.Shell.Error.t()}
   def delete(workspace_id, path) do
-    with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
+    with :ok <- validate_workspace_id(workspace_id),
+         {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
       case Jido.VFS.delete(mount.filesystem, relative_path) do
         :ok -> :ok
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
@@ -101,7 +136,8 @@ defmodule Jido.Shell.VFS do
   """
   @spec list_dir(workspace_id(), path()) :: {:ok, [map()]} | {:error, Jido.Shell.Error.t()}
   def list_dir(workspace_id, path) do
-    with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
+    with :ok <- validate_workspace_id(workspace_id),
+         {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
       case Jido.VFS.list_contents(mount.filesystem, relative_path) do
         {:ok, _} = result -> result
         {:error, reason} -> {:error, Jido.Shell.Error.vfs(error_code(reason), path)}
@@ -114,7 +150,8 @@ defmodule Jido.Shell.VFS do
   """
   @spec stat(workspace_id(), path()) :: {:ok, map()} | {:error, Jido.Shell.Error.t()}
   def stat(workspace_id, path) do
-    with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
+    with :ok <- validate_workspace_id(workspace_id),
+         {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
       if relative_path == "." do
         name =
           case Path.basename(path) do
@@ -158,7 +195,8 @@ defmodule Jido.Shell.VFS do
   """
   @spec mkdir(workspace_id(), path()) :: :ok | {:error, Jido.Shell.Error.t()}
   def mkdir(workspace_id, path) do
-    with {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
+    with :ok <- validate_workspace_id(workspace_id),
+         {:ok, mount, relative_path} <- resolve_path(workspace_id, path) do
       dir_path =
         if String.ends_with?(relative_path, "/"),
           do: relative_path,
@@ -196,4 +234,16 @@ defmodule Jido.Shell.VFS do
   defp error_code(:unsupported), do: :unsupported
   defp error_code(reason) when is_atom(reason), do: reason
   defp error_code(_), do: :unknown
+
+  defp valid_workspace_id?(workspace_id) do
+    is_binary(workspace_id) and String.trim(workspace_id) != ""
+  end
+
+  defp validate_workspace_id(workspace_id) do
+    if valid_workspace_id?(workspace_id) do
+      :ok
+    else
+      {:error, Error.session(:invalid_workspace_id, %{workspace_id: workspace_id})}
+    end
+  end
 end

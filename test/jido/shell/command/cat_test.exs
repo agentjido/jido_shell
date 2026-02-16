@@ -7,8 +7,8 @@ defmodule Jido.Shell.Command.CatTest do
 
   setup do
     VFS.init()
-    workspace_id = :"test_ws_#{System.unique_integer([:positive])}"
-    fs_name = :"test_fs_#{System.unique_integer([:positive])}"
+    workspace_id = "test_ws_#{System.unique_integer([:positive])}"
+    fs_name = "test_fs_#{System.unique_integer([:positive])}"
 
     start_supervised!(
       {Jido.VFS.Adapter.InMemory, {Jido.VFS.Adapter.InMemory, %Jido.VFS.Adapter.InMemory.Config{name: fs_name}}}
