@@ -121,6 +121,7 @@ end
 | `mkdir <dir>`             | Create directory                      |
 | `rm <file>`               | Remove file                           |
 | `cp <src> <dest>`         | Copy file                             |
+| `bash -c "<script>"`      | Run a bash-like script in sandbox     |
 | `env [VAR] [VAR=value]`   | Display or set environment variables  |
 | `help [command]`          | Show available commands               |
 | `sleep <seconds>`         | Sleep for duration                    |
