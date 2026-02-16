@@ -14,14 +14,11 @@ jobs:
   lint:
     name: Lint
     uses: agentjido/github-actions/.github/workflows/elixir-lint.yml@main
-    with:
-      otp_version: "27"
-      elixir_version: "1.18"
 
   test:
     name: Test
     uses: agentjido/github-actions/.github/workflows/elixir-test.yml@main
     with:
-      otp_versions: '["26", "27"]'
-      elixir_versions: '["1.17", "1.18"]'
+      otp_versions: '["27", "28"]'
+      elixir_versions: '["1.18", "1.19"]'
       test_command: mix test
