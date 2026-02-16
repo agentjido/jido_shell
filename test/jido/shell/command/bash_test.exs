@@ -100,6 +100,49 @@ defmodule Jido.Shell.Command.BashTest do
       assert {:output, "ok\n"} in events
       assert {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}} = result
     end
+
+    test "blocks network commands by default in sandbox mode", %{state: state} do
+      {result, _events} =
+        capture_events(fn emit ->
+          Bash.run(state, %{args: ["-c", "curl https://example.com"]}, emit)
+        end)
+
+      assert {:error, %Jido.Shell.Error{code: {:shell, :network_blocked}, message: message}} = result
+      assert message =~ "denied by default"
+    end
+
+    test "allows network command checks through per-execution context", %{state: state} do
+      state = %{state | meta: %{execution_context: %{network: %{allow_domains: ["example.com"]}}}}
+
+      {result, _events} =
+        capture_events(fn emit ->
+          Bash.run(state, %{args: ["-c", "curl https://example.com"]}, emit)
+        end)
+
+      assert {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}} = result
+    end
+
+    test "applies blocklists from execution context", %{state: state} do
+      state = %{
+        state
+        | meta: %{
+            execution_context: %{
+              network: %{
+                allow_domains: ["example.com"],
+                block_domains: ["example.com"]
+              }
+            }
+          }
+      }
+
+      {result, _events} =
+        capture_events(fn emit ->
+          Bash.run(state, %{args: ["-c", "curl https://example.com"]}, emit)
+        end)
+
+      assert {:error, %Jido.Shell.Error{code: {:shell, :network_blocked}, message: message}} = result
+      assert message =~ "blocklisted"
+    end
   end
 
   describe "integration with session" do
@@ -115,6 +158,24 @@ defmodule Jido.Shell.Command.BashTest do
 
       {:ok, state} = SessionServer.get_state(session_id)
       assert state.cwd == "/home"
+    end
+
+    test "supports per-command network execution context overrides", %{workspace_id: workspace_id} do
+      {:ok, session_id} = Session.start(workspace_id)
+      :ok = SessionServer.subscribe(session_id, self())
+
+      :ok = SessionServer.run_command(session_id, "bash -c \"curl https://example.com\"")
+
+      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :network_blocked}}}}
+
+      :ok =
+        SessionServer.run_command(
+          session_id,
+          "bash -c \"curl https://example.com\"",
+          execution_context: %{network: %{allow_domains: ["example.com"]}}
+        )
+
+      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}}
     end
   end
 

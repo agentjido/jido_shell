@@ -8,6 +8,7 @@ defmodule Jido.Shell.Sandbox.Bash do
   """
 
   alias Jido.Shell.CommandRunner
+  alias Jido.Shell.Sandbox.NetworkPolicy
   alias Jido.Shell.Session.State
 
   @type execute_result :: {:ok, State.t()} | {:error, Jido.Shell.Error.t()} | {:error, term()}
@@ -40,15 +41,20 @@ defmodule Jido.Shell.Sandbox.Bash do
   defp run_statements([], state, _emit), do: {:ok, state}
 
   defp run_statements([line | rest], state, emit) do
-    case CommandRunner.execute(state, line, emit) do
-      {:ok, {:state_update, changes}} ->
-        run_statements(rest, apply_state_updates(state, changes), emit)
+    execution_context = Map.get(state.meta, :execution_context, %{})
 
-      {:ok, _} ->
-        run_statements(rest, state, emit)
+    with :ok <- NetworkPolicy.enforce(line, execution_context),
+         result <- CommandRunner.execute(state, line, emit) do
+      case result do
+        {:ok, {:state_update, changes}} ->
+          run_statements(rest, apply_state_updates(state, changes), emit)
 
-      {:error, _} = error ->
-        error
+        {:ok, _} ->
+          run_statements(rest, state, emit)
+
+        {:error, _} = error ->
+          error
+      end
     end
   end
 

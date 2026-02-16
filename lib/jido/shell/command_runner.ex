@@ -14,7 +14,8 @@ defmodule Jido.Shell.CommandRunner do
   Sends messages back to the session_pid.
   """
   @spec run(pid(), State.t(), String.t(), keyword()) :: term()
-  def run(session_pid, state, line, _opts \\ []) do
+  def run(session_pid, state, line, opts \\ []) do
+    state = with_execution_context(state, opts)
     emit = fn event -> send(session_pid, {:command_event, event}) end
 
     result = execute(state, line, emit)
@@ -54,4 +55,45 @@ defmodule Jido.Shell.CommandRunner do
   defp args_to_input(args) do
     %{args: args}
   end
+
+  defp with_execution_context(%State{} = state, opts) do
+    base_context =
+      state.meta
+      |> Map.get(:execution_context, %{})
+      |> normalize_context()
+
+    runtime_context =
+      opts
+      |> Keyword.get(:execution_context, %{})
+      |> normalize_context()
+
+    merged_context = deep_merge(base_context, runtime_context)
+    %{state | meta: Map.put(state.meta, :execution_context, merged_context)}
+  end
+
+  defp normalize_context(value) when is_map(value) do
+    Enum.into(value, %{}, fn {key, val} ->
+      {key, normalize_context(val)}
+    end)
+  end
+
+  defp normalize_context(value) when is_list(value) do
+    if Keyword.keyword?(value) do
+      Enum.into(value, %{}, fn {key, val} ->
+        {key, normalize_context(val)}
+      end)
+    else
+      Enum.map(value, &normalize_context/1)
+    end
+  end
+
+  defp normalize_context(value), do: value
+
+  defp deep_merge(left, right) when is_map(left) and is_map(right) do
+    Map.merge(left, right, fn _key, left_val, right_val ->
+      deep_merge(left_val, right_val)
+    end)
+  end
+
+  defp deep_merge(_left, right), do: right
 end

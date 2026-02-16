@@ -127,6 +127,27 @@ end
 | `sleep <seconds>`         | Sleep for duration                    |
 | `seq <count> [delay]`     | Print sequence of numbers             |
 
+### Bash Network Permissions
+
+Network-style commands inside `bash` scripts are denied by default.
+
+You can allow specific domains/ports per execution:
+
+```elixir
+Jido.Shell.Agent.run(
+  session_id,
+  "bash -c \"curl https://example.com:8443\"",
+  execution_context: %{
+    network: %{
+      allow_domains: ["example.com"],
+      allow_ports: [8443],
+      block_domains: [],
+      block_ports: []
+    }
+  }
+)
+```
+
 ## Architecture
 
 ```

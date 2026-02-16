@@ -43,13 +43,19 @@ defmodule Jido.Shell.Agent do
   Runs a command and waits for completion.
 
   Returns the collected output or error.
+
+  ## Options
+
+  - `:timeout` - Receive timeout in milliseconds (default: 30000)
+  - `:execution_context` - Per-command execution context passed to sandboxed commands
   """
   @spec run(session(), String.t(), keyword()) :: result()
   def run(session_id, command, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, 30_000)
+    command_opts = Keyword.drop(opts, [:timeout])
 
     :ok = SessionServer.subscribe(session_id, self())
-    :ok = SessionServer.run_command(session_id, command)
+    :ok = SessionServer.run_command(session_id, command, command_opts)
 
     result = collect_output(session_id, [], timeout)
     :ok = SessionServer.unsubscribe(session_id, self())
