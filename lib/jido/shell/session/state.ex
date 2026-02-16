@@ -1,220 +1,54 @@
 defmodule Jido.Shell.Session.State do
+  @moduledoc deprecated: "Use Jido.Shell.ShellSession.State"
+
   @moduledoc """
-  Session state struct with Zoi schema validation.
+  Deprecated compatibility shim for `Jido.Shell.ShellSession.State`.
 
-  This struct represents the internal state held by a SessionServer,
-  including the current working directory, environment variables,
-  command history, and transport subscriptions.
-
-  ## Fields
-
-  - `id` - Unique session identifier (string)
-  - `workspace_id` - The workspace this session belongs to (string)
-  - `cwd` - Current working directory (defaults to "/")
-  - `env` - Environment variables (map)
-  - `history` - Command history (list of strings)
-  - `meta` - Additional metadata (map)
-  - `transports` - Set of subscribed transport PIDs
-  - `current_command` - Currently running command info, or nil
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "sess-123", workspace_id: "my_workspace"})
-      iex> state.cwd
-      "/"
-      iex> state.history
-      []
-
+  This module will be removed in a future release.
+  Note: state struct identity is now `%Jido.Shell.ShellSession.State{}`.
   """
 
-  @schema Zoi.struct(
-            __MODULE__,
-            %{
-              id: Zoi.string(),
-              workspace_id: Zoi.string() |> Zoi.min(1),
-              cwd: Zoi.string() |> Zoi.default("/"),
-              env: Zoi.map() |> Zoi.default(%{}),
-              history: Zoi.array(Zoi.string()) |> Zoi.default([]),
-              meta: Zoi.map() |> Zoi.default(%{}),
-              transports: Zoi.any() |> Zoi.default(MapSet.new()),
-              current_command: Zoi.any() |> Zoi.nullish()
-            },
-            coerce: true
-          )
+  alias Jido.Shell.ShellSession.State, as: ShellState
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @default_history_limit 500
+  @type t :: ShellState.t()
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
-
-  @doc """
-  Returns the Zoi schema for Session.State.
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.schema/0"
   @spec schema() :: term()
-  def schema, do: @schema
+  defdelegate schema(), to: ShellState
 
-  @doc """
-  Creates a new Session.State struct from a map, validating with Zoi schema.
-
-  ## Parameters
-
-  - `attrs` - Map with at least `:id` and `:workspace_id` keys
-
-  ## Returns
-
-  - `{:ok, state}` on success
-  - `{:error, errors}` on validation failure
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "sess-1", workspace_id: "test"})
-      iex> state.id
-      "sess-1"
-
-      iex> {:error, _} = Jido.Shell.Session.State.new(%{})
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.new/1"
   @spec new(map()) :: {:ok, t()} | {:error, term()}
-  def new(attrs) when is_map(attrs) do
-    Zoi.parse(@schema, attrs)
-  end
+  defdelegate new(attrs), to: ShellState
 
-  @doc """
-  Creates a new Session.State struct from a map, raising on validation errors.
-
-  ## Examples
-
-      iex> state = Jido.Shell.Session.State.new!(%{id: "sess-1", workspace_id: "test"})
-      iex> state.workspace_id
-      "test"
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.new!/1"
   @spec new!(map()) :: t()
-  def new!(attrs) when is_map(attrs) do
-    case new(attrs) do
-      {:ok, state} -> state
-      {:error, errors} -> raise ArgumentError, "Invalid state: #{inspect(errors)}"
-    end
-  end
+  defdelegate new!(attrs), to: ShellState
 
-  @doc """
-  Adds a transport PID to the session's transport set.
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
-      iex> state = Jido.Shell.Session.State.add_transport(state, self())
-      iex> MapSet.member?(state.transports, self())
-      true
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.add_transport/2"
   @spec add_transport(t(), pid()) :: t()
-  def add_transport(%__MODULE__{} = state, pid) when is_pid(pid) do
-    %{state | transports: MapSet.put(state.transports, pid)}
-  end
+  defdelegate add_transport(state, pid), to: ShellState
 
-  @doc """
-  Removes a transport PID from the session's transport set.
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
-      iex> state = Jido.Shell.Session.State.add_transport(state, self())
-      iex> state = Jido.Shell.Session.State.remove_transport(state, self())
-      iex> MapSet.member?(state.transports, self())
-      false
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.remove_transport/2"
   @spec remove_transport(t(), pid()) :: t()
-  def remove_transport(%__MODULE__{} = state, pid) when is_pid(pid) do
-    %{state | transports: MapSet.delete(state.transports, pid)}
-  end
+  defdelegate remove_transport(state, pid), to: ShellState
 
-  @doc """
-  Adds a command line to the session history.
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
-      iex> state = Jido.Shell.Session.State.add_to_history(state, "ls -la")
-      iex> hd(state.history)
-      "ls -la"
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.add_to_history/2"
   @spec add_to_history(t(), String.t()) :: t()
-  def add_to_history(%__MODULE__{} = state, line) when is_binary(line) do
-    history_limit = history_limit(state)
-    %{state | history: [line | state.history] |> Enum.take(history_limit)}
-  end
+  defdelegate add_to_history(state, line), to: ShellState
 
-  @doc """
-  Updates the current working directory.
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
-      iex> state = Jido.Shell.Session.State.set_cwd(state, "/home/user")
-      iex> state.cwd
-      "/home/user"
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.set_cwd/2"
   @spec set_cwd(t(), String.t()) :: t()
-  def set_cwd(%__MODULE__{} = state, cwd) when is_binary(cwd) do
-    %{state | cwd: cwd}
-  end
+  defdelegate set_cwd(state, cwd), to: ShellState
 
-  @doc """
-  Sets the currently running command.
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
-      iex> state = Jido.Shell.Session.State.set_current_command(state, %{line: "ls", task: self()})
-      iex> state.current_command.line
-      "ls"
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.set_current_command/2"
   @spec set_current_command(t(), map() | nil) :: t()
-  def set_current_command(%__MODULE__{} = state, command) do
-    %{state | current_command: command}
-  end
+  defdelegate set_current_command(state, command), to: ShellState
 
-  @doc """
-  Clears the currently running command.
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
-      iex> state = Jido.Shell.Session.State.set_current_command(state, %{line: "ls"})
-      iex> state = Jido.Shell.Session.State.clear_current_command(state)
-      iex> state.current_command
-      nil
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.clear_current_command/1"
   @spec clear_current_command(t()) :: t()
-  def clear_current_command(%__MODULE__{} = state) do
-    %{state | current_command: nil}
-  end
+  defdelegate clear_current_command(state), to: ShellState
 
-  @doc """
-  Checks if a command is currently running.
-
-  ## Examples
-
-      iex> {:ok, state} = Jido.Shell.Session.State.new(%{id: "s", workspace_id: "w"})
-      iex> Jido.Shell.Session.State.command_running?(state)
-      false
-
-  """
+  @deprecated "Use Jido.Shell.ShellSession.State.command_running?/1"
   @spec command_running?(t()) :: boolean()
-  def command_running?(%__MODULE__{current_command: nil}), do: false
-  def command_running?(%__MODULE__{current_command: _}), do: true
-
-  defp history_limit(%__MODULE__{meta: meta}) do
-    case Map.get(meta, :history_limit, Map.get(meta, "history_limit", @default_history_limit)) do
-      limit when is_integer(limit) and limit > 0 -> limit
-      _ -> @default_history_limit
-    end
-  end
+  defdelegate command_running?(state), to: ShellState
 end

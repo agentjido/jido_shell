@@ -1,7 +1,7 @@
 defmodule Jido.Shell.Command.SleepTest do
   use Jido.Shell.Case, async: true
 
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
   alias Jido.Shell.Command.Sleep
 
   setup do

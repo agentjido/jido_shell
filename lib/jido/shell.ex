@@ -18,11 +18,11 @@ defmodule Jido.Shell do
   ## Quick Start
 
       # Start a session
-      {:ok, session_id} = Jido.Shell.Session.start("my_workspace")
+      {:ok, session_id} = Jido.Shell.ShellSession.start("my_workspace")
 
       # Run commands
-      Jido.Shell.SessionServer.run_command(session_id, "pwd")
-      Jido.Shell.SessionServer.run_command(session_id, "ls")
+      Jido.Shell.ShellSessionServer.run_command(session_id, "pwd")
+      Jido.Shell.ShellSessionServer.run_command(session_id, "ls")
 
   """
 

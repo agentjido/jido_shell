@@ -2,7 +2,7 @@ defmodule Jido.Shell.CommandRunnerTest do
   use Jido.Shell.Case, async: true
 
   alias Jido.Shell.CommandRunner
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
 
   setup do
     {:ok, state} = State.new(%{id: "test-session", workspace_id: "test", cwd: "/home/user"})

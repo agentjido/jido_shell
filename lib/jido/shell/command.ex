@@ -31,7 +31,7 @@ defmodule Jido.Shell.Command do
       end
   """
 
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
 
   @type emit :: (event :: term() -> :ok)
   @type run_result :: {:ok, term()} | {:error, Jido.Shell.Error.t()}

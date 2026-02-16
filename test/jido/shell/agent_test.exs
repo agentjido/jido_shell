@@ -108,7 +108,7 @@ defmodule Jido.Shell.AgentTest do
     end
 
     test "returns cancellation errors when session command is cancelled", %{session_id: session_id} do
-      {:ok, :subscribed} = Jido.Shell.SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = Jido.Shell.ShellSessionServer.subscribe(session_id, self())
 
       task =
         Task.async(fn ->
@@ -116,13 +116,13 @@ defmodule Jido.Shell.AgentTest do
         end)
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 5"}}
-      assert {:ok, :cancelled} = Jido.Shell.SessionServer.cancel(session_id)
+      assert {:ok, :cancelled} = Jido.Shell.ShellSessionServer.cancel(session_id)
 
       assert {:error, %Jido.Shell.Error{code: {:command, :cancelled}}} = Task.await(task, 2_000)
     end
 
     test "returns crash errors when a command crashes", %{session_id: session_id} do
-      {:ok, :subscribed} = Jido.Shell.SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = Jido.Shell.ShellSessionServer.subscribe(session_id, self())
 
       task =
         Task.async(fn ->
@@ -253,7 +253,7 @@ defmodule Jido.Shell.AgentTest do
   describe "stop/1" do
     test "stops the session", %{workspace_id: workspace_id} do
       {:ok, session_id} = Agent.new(workspace_id)
-      {:ok, pid} = Jido.Shell.Session.lookup(session_id)
+      {:ok, pid} = Jido.Shell.ShellSession.lookup(session_id)
       ref = Process.monitor(pid)
 
       :ok = Agent.stop(session_id)
@@ -262,7 +262,7 @@ defmodule Jido.Shell.AgentTest do
 
       {:ok, :done} =
         poll_until(fn ->
-          case Jido.Shell.Session.lookup(session_id) do
+          case Jido.Shell.ShellSession.lookup(session_id) do
             {:error, :not_found} -> {:ok, :done}
             {:ok, _} -> :retry
           end
@@ -314,20 +314,20 @@ defmodule Jido.Shell.AgentTest do
 
     test "ignores pre-start session events until command_started arrives" do
       session_id = "mock_session_#{System.unique_integer([:positive])}"
-      copy(Jido.Shell.SessionServer)
+      copy(Jido.Shell.ShellSessionServer)
 
-      expect(Jido.Shell.SessionServer, :subscribe, fn ^session_id, pid when pid == self() ->
+      expect(Jido.Shell.ShellSessionServer, :subscribe, fn ^session_id, pid when pid == self() ->
         {:ok, :subscribed}
       end)
 
-      expect(Jido.Shell.SessionServer, :run_command, fn ^session_id, "echo hi", [] ->
+      expect(Jido.Shell.ShellSessionServer, :run_command, fn ^session_id, "echo hi", [] ->
         send(self(), {:jido_shell_session, session_id, {:output, "stale\n"}})
         send(self(), {:jido_shell_session, session_id, {:command_started, "echo hi"}})
         send(self(), {:jido_shell_session, session_id, :command_done})
         {:ok, :accepted}
       end)
 
-      expect(Jido.Shell.SessionServer, :unsubscribe, fn ^session_id, pid when pid == self() ->
+      expect(Jido.Shell.ShellSessionServer, :unsubscribe, fn ^session_id, pid when pid == self() ->
         {:ok, :unsubscribed}
       end)
 

@@ -9,7 +9,7 @@ defmodule Jido.Shell.Sandbox.Bash do
 
   alias Jido.Shell.CommandRunner
   alias Jido.Shell.Sandbox.NetworkPolicy
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
 
   @type execute_result :: {:ok, State.t()} | {:error, Jido.Shell.Error.t()} | {:error, term()}
 

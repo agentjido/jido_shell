@@ -72,6 +72,7 @@ defmodule Jido.Shell.MixProject do
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.14"},
       {:jido_vfs, github: "agentjido/hako"},
+      {:sprites, git: "https://github.com/superfly/sprites-ex.git", optional: true},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -133,10 +134,20 @@ defmodule Jido.Shell.MixProject do
         Core: [
           Jido.Shell,
           Jido.Shell.Agent,
+          Jido.Shell.Backend,
+          Jido.Shell.ShellSession,
+          Jido.Shell.ShellSessionServer,
+          Jido.Shell.ShellSession.State,
+          Jido.Shell.Error
+        ],
+        Deprecated: [
           Jido.Shell.Session,
           Jido.Shell.SessionServer,
-          Jido.Shell.Session.State,
-          Jido.Shell.Error
+          Jido.Shell.Session.State
+        ],
+        Backends: [
+          Jido.Shell.Backend.Local,
+          Jido.Shell.Backend.Sprite
         ],
         Commands: ~r/Jido\.Shell\.Command.*/,
         "Virtual Filesystem": [

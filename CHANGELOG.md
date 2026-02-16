@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Renamed session namespace to explicit shell session modules:
+  - `Jido.Shell.ShellSession`,
+  - `Jido.Shell.ShellSessionServer`,
+  - `Jido.Shell.ShellSession.State`.
+- Kept `Jido.Shell.Session`, `Jido.Shell.SessionServer`, and `Jido.Shell.Session.State` as deprecated compatibility shims.
+- Canonicalized state struct identity to `%Jido.Shell.ShellSession.State{}`.
 - Hardened identifier model to use binary workspace IDs across public APIs.
 - Removed runtime-generated atom usage from session/VFS workflows.
 - Updated `SessionServer` and `Agent` APIs to return explicit structured errors for missing sessions and invalid identifiers instead of crashing callers.

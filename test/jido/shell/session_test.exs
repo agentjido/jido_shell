@@ -1,7 +1,7 @@
-defmodule Jido.Shell.SessionTest do
+defmodule Jido.Shell.ShellSessionTest do
   use Jido.Shell.Case, async: true
 
-  alias Jido.Shell.Session
+  alias Jido.Shell.ShellSession
 
   defp poll_until(fun, timeout \\ 100, interval \\ 5) do
     deadline = System.monotonic_time(:millisecond) + timeout
@@ -25,18 +25,18 @@ defmodule Jido.Shell.SessionTest do
 
   describe "generate_id/0" do
     test "generates unique IDs with sess- prefix" do
-      id = Session.generate_id()
+      id = ShellSession.generate_id()
       assert String.starts_with?(id, "sess-")
     end
 
     test "generates different IDs each time" do
-      id1 = Session.generate_id()
-      id2 = Session.generate_id()
+      id1 = ShellSession.generate_id()
+      id2 = ShellSession.generate_id()
       assert id1 != id2
     end
 
     test "ID has expected format (sess- followed by UUID)" do
-      id = Session.generate_id()
+      id = ShellSession.generate_id()
 
       assert Regex.match?(
                ~r/^sess-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -47,21 +47,21 @@ defmodule Jido.Shell.SessionTest do
 
   describe "via_registry/1" do
     test "returns via tuple with correct structure" do
-      via = Session.via_registry("sess-123")
+      via = ShellSession.via_registry("sess-123")
       assert {:via, Registry, {Jido.Shell.SessionRegistry, "sess-123"}} = via
     end
   end
 
   describe "lookup/1" do
     test "returns {:error, :not_found} for non-existent session" do
-      assert {:error, :not_found} = Session.lookup("nonexistent-session")
+      assert {:error, :not_found} = ShellSession.lookup("nonexistent-session")
     end
 
     test "returns {:ok, pid} when session is registered" do
-      session_id = Session.generate_id()
+      session_id = ShellSession.generate_id()
       {:ok, _pid} = Registry.register(Jido.Shell.SessionRegistry, session_id, nil)
 
-      assert {:ok, pid} = Session.lookup(session_id)
+      assert {:ok, pid} = ShellSession.lookup(session_id)
       assert is_pid(pid)
       assert pid == self()
     end
@@ -69,60 +69,60 @@ defmodule Jido.Shell.SessionTest do
 
   describe "start/2" do
     test "starts a session for a workspace" do
-      {:ok, session_id} = Session.start("test_workspace")
+      {:ok, session_id} = ShellSession.start("test_workspace")
       assert String.starts_with?(session_id, "sess-")
 
-      assert {:ok, pid} = Session.lookup(session_id)
+      assert {:ok, pid} = ShellSession.lookup(session_id)
       assert Process.alive?(pid)
     end
 
     test "accepts custom session_id" do
       custom_id = "sess-custom-123"
-      {:ok, ^custom_id} = Session.start("test", session_id: custom_id)
-      assert {:ok, _} = Session.lookup(custom_id)
+      {:ok, ^custom_id} = ShellSession.start("test", session_id: custom_id)
+      assert {:ok, _} = ShellSession.lookup(custom_id)
     end
 
     test "passes options to SessionServer" do
-      {:ok, session_id} = Session.start("test", cwd: "/home", env: %{"X" => "1"})
-      {:ok, state} = Jido.Shell.SessionServer.get_state(session_id)
+      {:ok, session_id} = ShellSession.start("test", cwd: "/home", env: %{"X" => "1"})
+      {:ok, state} = Jido.Shell.ShellSessionServer.get_state(session_id)
       assert state.cwd == "/home"
       assert state.env == %{"X" => "1"}
     end
 
     test "rejects invalid workspace_id types" do
       assert {:error, %Jido.Shell.Error{code: {:session, :invalid_workspace_id}}} =
-               Session.start(:test_workspace)
+               ShellSession.start(:test_workspace)
     end
 
     test "rejects empty workspace identifiers" do
       assert {:error, %Jido.Shell.Error{code: {:session, :invalid_workspace_id}}} =
-               Session.start("   ")
+               ShellSession.start("   ")
     end
 
     test "returns supervisor child-start errors for duplicate session IDs" do
       session_id = "sess-duplicate-#{System.unique_integer([:positive])}"
-      assert {:ok, ^session_id} = Session.start("dup_ws", session_id: session_id)
-      assert {:error, _} = Session.start("dup_ws", session_id: session_id)
+      assert {:ok, ^session_id} = ShellSession.start("dup_ws", session_id: session_id)
+      assert {:error, _} = ShellSession.start("dup_ws", session_id: session_id)
 
       on_exit(fn ->
-        _ = Session.stop(session_id)
+        _ = ShellSession.stop(session_id)
       end)
     end
   end
 
   describe "stop/1" do
     test "stops a running session" do
-      {:ok, session_id} = Session.start("test")
-      assert {:ok, pid} = Session.lookup(session_id)
+      {:ok, session_id} = ShellSession.start("test")
+      assert {:ok, pid} = ShellSession.lookup(session_id)
       ref = Process.monitor(pid)
 
-      :ok = Session.stop(session_id)
+      :ok = ShellSession.stop(session_id)
 
       assert_receive {:DOWN, ^ref, :process, ^pid, _reason}
 
       {:ok, :done} =
         poll_until(fn ->
-          case Session.lookup(session_id) do
+          case ShellSession.lookup(session_id) do
             {:error, :not_found} -> {:ok, :done}
             {:ok, _} -> :retry
           end
@@ -130,7 +130,7 @@ defmodule Jido.Shell.SessionTest do
     end
 
     test "returns error for non-existent session" do
-      assert {:error, :not_found} = Session.stop("nonexistent")
+      assert {:error, :not_found} = ShellSession.stop("nonexistent")
     end
   end
 
@@ -143,10 +143,10 @@ defmodule Jido.Shell.SessionTest do
     test "starts a session with VFS auto-mounted" do
       workspace_id = "test_ws_vfs_#{System.unique_integer([:positive])}"
 
-      {:ok, session_id} = Session.start_with_vfs(workspace_id)
+      {:ok, session_id} = ShellSession.start_with_vfs(workspace_id)
 
       assert String.starts_with?(session_id, "sess-")
-      assert {:ok, _} = Session.lookup(session_id)
+      assert {:ok, _} = ShellSession.lookup(session_id)
 
       mounts = Jido.Shell.VFS.list_mounts(workspace_id)
       assert length(mounts) == 1
@@ -167,9 +167,9 @@ defmodule Jido.Shell.SessionTest do
 
       :ok = Jido.Shell.VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
-      {:ok, session_id} = Session.start_with_vfs(workspace_id)
+      {:ok, session_id} = ShellSession.start_with_vfs(workspace_id)
 
-      assert {:ok, _} = Session.lookup(session_id)
+      assert {:ok, _} = ShellSession.lookup(session_id)
       mounts = Jido.Shell.VFS.list_mounts(workspace_id)
       assert length(mounts) == 1
 
@@ -180,15 +180,15 @@ defmodule Jido.Shell.SessionTest do
 
     test "merges managed mount metadata with existing session metadata" do
       workspace_id = "test_ws_meta_#{System.unique_integer([:positive])}"
-      {:ok, session_id} = Session.start_with_vfs(workspace_id, meta: %{actor: "test"})
+      {:ok, session_id} = ShellSession.start_with_vfs(workspace_id, meta: %{actor: "test"})
 
-      {:ok, state} = Jido.Shell.SessionServer.get_state(session_id)
+      {:ok, state} = Jido.Shell.ShellSessionServer.get_state(session_id)
       assert state.meta.actor == "test"
       assert state.meta.managed_workspace_mount == true
 
       on_exit(fn ->
-        _ = Session.stop(session_id)
-        _ = Session.teardown_workspace(workspace_id)
+        _ = ShellSession.stop(session_id)
+        _ = ShellSession.teardown_workspace(workspace_id)
       end)
     end
   end
@@ -205,7 +205,7 @@ defmodule Jido.Shell.SessionTest do
         )
 
       assert length(Jido.Shell.VFS.list_mounts(workspace_id)) == 1
-      assert :ok = Session.teardown_workspace(workspace_id, managed_only: true)
+      assert :ok = ShellSession.teardown_workspace(workspace_id, managed_only: true)
       assert [] = Jido.Shell.VFS.list_mounts(workspace_id)
     end
   end

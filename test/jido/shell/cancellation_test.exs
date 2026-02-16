@@ -1,49 +1,49 @@
 defmodule Jido.Shell.CancellationTest do
   use Jido.Shell.Case, async: true
 
-  alias Jido.Shell.Session
-  alias Jido.Shell.SessionServer
+  alias Jido.Shell.ShellSession
+  alias Jido.Shell.ShellSessionServer
 
   setup do
     workspace_id = "test_ws_#{System.unique_integer([:positive])}"
-    {:ok, session_id} = Session.start(workspace_id)
-    {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+    {:ok, session_id} = ShellSession.start(workspace_id)
+    {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
     {:ok, session_id: session_id}
   end
 
   describe "cancel/1" do
     test "cancels running command", %{session_id: session_id} do
-      {:ok, :accepted} = SessionServer.run_command(session_id, "sleep 10")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 10")
 
       assert_receive {:jido_shell_session, _, {:command_started, "sleep 10"}}
       assert_receive {:jido_shell_session, _, {:output, "Sleeping for 10 seconds...\n"}}
 
-      {:ok, :cancelled} = SessionServer.cancel(session_id)
+      {:ok, :cancelled} = ShellSessionServer.cancel(session_id)
 
       assert_receive {:jido_shell_session, _, :command_cancelled}
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       refute state.current_command
     end
 
     test "does nothing when no command running", %{session_id: session_id} do
       assert {:error, %Jido.Shell.Error{code: {:session, :invalid_state_transition}}} =
-               SessionServer.cancel(session_id)
+               ShellSessionServer.cancel(session_id)
 
       refute_receive {:jido_shell_session, _, _}, 100
     end
 
     test "allows new command after cancellation", %{session_id: session_id} do
-      {:ok, :accepted} = SessionServer.run_command(session_id, "sleep 10")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 10")
       assert_receive {:jido_shell_session, _, {:command_started, _}}
 
-      {:ok, :cancelled} = SessionServer.cancel(session_id)
+      {:ok, :cancelled} = ShellSessionServer.cancel(session_id)
       assert_receive {:jido_shell_session, _, :command_cancelled}
 
       wait_until_idle(session_id)
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "echo done")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo done")
       assert_receive {:jido_shell_session, _, {:command_started, "echo done"}}
       assert_receive {:jido_shell_session, _, {:output, "done\n"}}, 1_000
       assert_receive {:jido_shell_session, _, :command_done}, 1_000
@@ -52,7 +52,7 @@ defmodule Jido.Shell.CancellationTest do
 
   describe "streaming" do
     test "streams output chunks", %{session_id: session_id} do
-      {:ok, :accepted} = SessionServer.run_command(session_id, "seq 3 10")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "seq 3 10")
 
       assert_receive {:jido_shell_session, _, {:command_started, _}}
       assert_receive {:jido_shell_session, _, {:output, "1\n"}}
@@ -64,30 +64,30 @@ defmodule Jido.Shell.CancellationTest do
 
   describe "robustness" do
     test "handles late messages from cancelled command", %{session_id: session_id} do
-      {:ok, :accepted} = SessionServer.run_command(session_id, "seq 5 50")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "seq 5 50")
       assert_receive {:jido_shell_session, _, {:command_started, _}}
 
       assert_receive {:jido_shell_session, _, {:output, "1\n"}}
 
-      {:ok, :cancelled} = SessionServer.cancel(session_id)
+      {:ok, :cancelled} = ShellSessionServer.cancel(session_id)
       assert_receive {:jido_shell_session, _, :command_cancelled}
 
       Process.sleep(100)
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       refute state.current_command
     end
 
     test "rejects command when busy", %{session_id: session_id} do
-      {:ok, :accepted} = SessionServer.run_command(session_id, "sleep 5")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 5")
       assert_receive {:jido_shell_session, _, {:command_started, _}}
 
       assert {:error, %Jido.Shell.Error{code: {:shell, :busy}}} =
-               SessionServer.run_command(session_id, "echo hello")
+               ShellSessionServer.run_command(session_id, "echo hello")
 
       assert_receive {:jido_shell_session, _, {:error, %Jido.Shell.Error{code: {:shell, :busy}}}}
 
-      {:ok, :cancelled} = SessionServer.cancel(session_id)
+      {:ok, :cancelled} = ShellSessionServer.cancel(session_id)
     end
   end
 
@@ -95,7 +95,7 @@ defmodule Jido.Shell.CancellationTest do
   defp wait_until_idle(_session_id, 0), do: :ok
 
   defp wait_until_idle(session_id, attempts) do
-    case SessionServer.get_state(session_id) do
+    case ShellSessionServer.get_state(session_id) do
       {:ok, %{current_command: nil}} ->
         :ok
 

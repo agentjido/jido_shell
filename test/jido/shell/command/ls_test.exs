@@ -2,7 +2,7 @@ defmodule Jido.Shell.Command.LsTest do
   use Jido.Shell.Case, async: false
 
   alias Jido.Shell.Command.Ls
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
   alias Jido.Shell.VFS
 
   setup do

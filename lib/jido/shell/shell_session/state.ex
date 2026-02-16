@@ -1,0 +1,224 @@
+defmodule Jido.Shell.ShellSession.State do
+  @moduledoc """
+  Session state struct with Zoi schema validation.
+
+  This struct represents the internal state held by a ShellSessionServer,
+  including the current working directory, environment variables,
+  command history, and transport subscriptions.
+
+  ## Fields
+
+  - `id` - Unique session identifier (string)
+  - `workspace_id` - The workspace this session belongs to (string)
+  - `cwd` - Current working directory (defaults to "/")
+  - `env` - Environment variables (map)
+  - `history` - Command history (list of strings)
+  - `meta` - Additional metadata (map)
+  - `transports` - Set of subscribed transport PIDs
+  - `current_command` - Currently running command info, or nil
+  - `backend` - Backend module implementing `Jido.Shell.Backend`
+  - `backend_state` - Backend-specific runtime state
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "sess-123", workspace_id: "my_workspace"})
+      iex> state.cwd
+      "/"
+      iex> state.history
+      []
+
+  """
+
+  @schema Zoi.struct(
+            __MODULE__,
+            %{
+              id: Zoi.string(),
+              workspace_id: Zoi.string() |> Zoi.min(1),
+              cwd: Zoi.string() |> Zoi.default("/"),
+              env: Zoi.map() |> Zoi.default(%{}),
+              history: Zoi.array(Zoi.string()) |> Zoi.default([]),
+              meta: Zoi.map() |> Zoi.default(%{}),
+              transports: Zoi.any() |> Zoi.default(MapSet.new()),
+              current_command: Zoi.any() |> Zoi.nullish(),
+              backend: Zoi.any() |> Zoi.default(Jido.Shell.Backend.Local),
+              backend_state: Zoi.any() |> Zoi.nullish()
+            },
+            coerce: true
+          )
+
+  @type t :: unquote(Zoi.type_spec(@schema))
+  @default_history_limit 500
+
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+
+  @doc """
+  Returns the Zoi schema for ShellSession.State.
+  """
+  @spec schema() :: term()
+  def schema, do: @schema
+
+  @doc """
+  Creates a new ShellSession.State struct from a map, validating with Zoi schema.
+
+  ## Parameters
+
+  - `attrs` - Map with at least `:id` and `:workspace_id` keys
+
+  ## Returns
+
+  - `{:ok, state}` on success
+  - `{:error, errors}` on validation failure
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "sess-1", workspace_id: "test"})
+      iex> state.id
+      "sess-1"
+
+      iex> {:error, _} = Jido.Shell.ShellSession.State.new(%{})
+
+  """
+  @spec new(map()) :: {:ok, t()} | {:error, term()}
+  def new(attrs) when is_map(attrs) do
+    Zoi.parse(@schema, attrs)
+  end
+
+  @doc """
+  Creates a new ShellSession.State struct from a map, raising on validation errors.
+
+  ## Examples
+
+      iex> state = Jido.Shell.ShellSession.State.new!(%{id: "sess-1", workspace_id: "test"})
+      iex> state.workspace_id
+      "test"
+
+  """
+  @spec new!(map()) :: t()
+  def new!(attrs) when is_map(attrs) do
+    case new(attrs) do
+      {:ok, state} -> state
+      {:error, errors} -> raise ArgumentError, "Invalid state: #{inspect(errors)}"
+    end
+  end
+
+  @doc """
+  Adds a transport PID to the session's transport set.
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "s", workspace_id: "w"})
+      iex> state = Jido.Shell.ShellSession.State.add_transport(state, self())
+      iex> MapSet.member?(state.transports, self())
+      true
+
+  """
+  @spec add_transport(t(), pid()) :: t()
+  def add_transport(%__MODULE__{} = state, pid) when is_pid(pid) do
+    %{state | transports: MapSet.put(state.transports, pid)}
+  end
+
+  @doc """
+  Removes a transport PID from the session's transport set.
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "s", workspace_id: "w"})
+      iex> state = Jido.Shell.ShellSession.State.add_transport(state, self())
+      iex> state = Jido.Shell.ShellSession.State.remove_transport(state, self())
+      iex> MapSet.member?(state.transports, self())
+      false
+
+  """
+  @spec remove_transport(t(), pid()) :: t()
+  def remove_transport(%__MODULE__{} = state, pid) when is_pid(pid) do
+    %{state | transports: MapSet.delete(state.transports, pid)}
+  end
+
+  @doc """
+  Adds a command line to the session history.
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "s", workspace_id: "w"})
+      iex> state = Jido.Shell.ShellSession.State.add_to_history(state, "ls -la")
+      iex> hd(state.history)
+      "ls -la"
+
+  """
+  @spec add_to_history(t(), String.t()) :: t()
+  def add_to_history(%__MODULE__{} = state, line) when is_binary(line) do
+    history_limit = history_limit(state)
+    %{state | history: [line | state.history] |> Enum.take(history_limit)}
+  end
+
+  @doc """
+  Updates the current working directory.
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "s", workspace_id: "w"})
+      iex> state = Jido.Shell.ShellSession.State.set_cwd(state, "/home/user")
+      iex> state.cwd
+      "/home/user"
+
+  """
+  @spec set_cwd(t(), String.t()) :: t()
+  def set_cwd(%__MODULE__{} = state, cwd) when is_binary(cwd) do
+    %{state | cwd: cwd}
+  end
+
+  @doc """
+  Sets the currently running command.
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "s", workspace_id: "w"})
+      iex> state = Jido.Shell.ShellSession.State.set_current_command(state, %{line: "ls", task: self()})
+      iex> state.current_command.line
+      "ls"
+
+  """
+  @spec set_current_command(t(), map() | nil) :: t()
+  def set_current_command(%__MODULE__{} = state, command) do
+    %{state | current_command: command}
+  end
+
+  @doc """
+  Clears the currently running command.
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "s", workspace_id: "w"})
+      iex> state = Jido.Shell.ShellSession.State.set_current_command(state, %{line: "ls"})
+      iex> state = Jido.Shell.ShellSession.State.clear_current_command(state)
+      iex> state.current_command
+      nil
+
+  """
+  @spec clear_current_command(t()) :: t()
+  def clear_current_command(%__MODULE__{} = state) do
+    %{state | current_command: nil}
+  end
+
+  @doc """
+  Checks if a command is currently running.
+
+  ## Examples
+
+      iex> {:ok, state} = Jido.Shell.ShellSession.State.new(%{id: "s", workspace_id: "w"})
+      iex> Jido.Shell.ShellSession.State.command_running?(state)
+      false
+
+  """
+  @spec command_running?(t()) :: boolean()
+  def command_running?(%__MODULE__{current_command: nil}), do: false
+  def command_running?(%__MODULE__{current_command: _}), do: true
+
+  defp history_limit(%__MODULE__{meta: meta}) do
+    case Map.get(meta, :history_limit, Map.get(meta, "history_limit", @default_history_limit)) do
+      limit when is_integer(limit) and limit > 0 -> limit
+      _ -> @default_history_limit
+    end
+  end
+end

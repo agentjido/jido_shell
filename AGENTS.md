@@ -31,11 +31,14 @@ Jido.Shell.Supervisor
 ## Main Modules
 
 - `Jido.Shell.Agent` - synchronous API for agents
-- `Jido.Shell.Session` - session lifecycle
-- `Jido.Shell.SessionServer` - per-session GenServer
+- `Jido.Shell.ShellSession` - session lifecycle
+- `Jido.Shell.ShellSessionServer` - per-session GenServer
+- `Jido.Shell.ShellSession.State` - canonical session state struct
 - `Jido.Shell.CommandRunner` - command execution and chaining
 - `Jido.Shell.VFS` - mounted filesystem router
 - `Jido.Shell.Transport.IEx` - interactive shell transport
+
+Deprecated compatibility shims: `Jido.Shell.Session`, `Jido.Shell.SessionServer`, `Jido.Shell.Session.State`.
 
 ## Session Events
 

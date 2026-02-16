@@ -4,17 +4,17 @@ defmodule Jido.Shell.Transport.IExTest do
   import ExUnit.CaptureIO
 
   alias Jido.Shell.Error
-  alias Jido.Shell.Session
+  alias Jido.Shell.ShellSession
   alias Jido.Shell.Transport.IEx
-  alias Jido.Shell.SessionServer
+  alias Jido.Shell.ShellSessionServer
 
   defp start_session!() do
     workspace_id = "test_ws_#{System.unique_integer([:positive])}"
-    {:ok, session_id} = Session.start_with_vfs(workspace_id)
+    {:ok, session_id} = ShellSession.start_with_vfs(workspace_id)
 
     on_exit(fn ->
-      _ = Session.stop(session_id)
-      _ = Session.teardown_workspace(workspace_id)
+      _ = ShellSession.stop(session_id)
+      _ = ShellSession.teardown_workspace(workspace_id)
     end)
 
     {workspace_id, session_id}
@@ -41,9 +41,9 @@ defmodule Jido.Shell.Transport.IExTest do
   describe "event handling" do
     test "receives events from session" do
       {_workspace_id, session_id} = start_session!()
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "echo hello")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo hello")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "echo hello"}}
       assert_receive {:jido_shell_session, ^session_id, {:output, "hello\n"}}
@@ -201,7 +201,7 @@ defmodule Jido.Shell.Transport.IExTest do
         case Process.get(:iex_step, 0) do
           0 ->
             Process.put(:iex_step, 1)
-            :ok = Session.stop(session_id)
+            :ok = ShellSession.stop(session_id)
             "echo hi\n"
 
           _ ->

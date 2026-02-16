@@ -18,8 +18,8 @@ defmodule Jido.Shell.Transport.IEx do
   Use "exit" or press Ctrl+C to exit the shell.
   """
 
-  alias Jido.Shell.Session
-  alias Jido.Shell.SessionServer
+  alias Jido.Shell.ShellSession
+  alias Jido.Shell.ShellSessionServer
 
   @prompt_color IO.ANSI.cyan()
   @error_color IO.ANSI.red()
@@ -34,13 +34,13 @@ defmodule Jido.Shell.Transport.IEx do
   def start(workspace_id, opts \\ []) when is_binary(workspace_id) do
     session_result =
       case Keyword.get(opts, :session_id) do
-        nil -> Session.start_with_vfs(workspace_id, opts)
+        nil -> ShellSession.start_with_vfs(workspace_id, opts)
         session_id -> {:ok, session_id}
       end
 
     with {:ok, session_id} <- session_result,
-         {:ok, :subscribed} <- SessionServer.subscribe(session_id, self()),
-         {:ok, initial_state} <- SessionServer.get_state(session_id) do
+         {:ok, :subscribed} <- ShellSessionServer.subscribe(session_id, self()),
+         {:ok, initial_state} <- ShellSessionServer.get_state(session_id) do
       IO.puts("Jido.Shell v#{Jido.Shell.version()}")
       IO.puts("Type \"exit\" to quit, \"help\" for commands.\n")
 
@@ -53,10 +53,10 @@ defmodule Jido.Shell.Transport.IEx do
   """
   @spec attach(String.t(), keyword()) :: :ok | {:error, Jido.Shell.Error.t() | :not_found}
   def attach(session_id, opts \\ []) do
-    case Session.lookup(session_id) do
+    case ShellSession.lookup(session_id) do
       {:ok, _pid} ->
-        with {:ok, :subscribed} <- SessionServer.subscribe(session_id, self()),
-             {:ok, state} <- SessionServer.get_state(session_id) do
+        with {:ok, :subscribed} <- ShellSessionServer.subscribe(session_id, self()),
+             {:ok, state} <- ShellSessionServer.get_state(session_id) do
           IO.puts("Attached to session #{session_id}")
           loop(session_id, state.cwd, opts)
         end
@@ -100,7 +100,7 @@ defmodule Jido.Shell.Transport.IEx do
   defp handle_input(_session_id, "quit", _cwd, _timeout), do: :exit
 
   defp handle_input(session_id, line, cwd, timeout_ms) do
-    case SessionServer.run_command(session_id, line) do
+    case ShellSessionServer.run_command(session_id, line) do
       {:ok, :accepted} ->
         new_cwd = wait_for_completion(session_id, cwd, timeout_ms)
         {:continue, new_cwd}

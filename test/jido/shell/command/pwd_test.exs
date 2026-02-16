@@ -2,7 +2,7 @@ defmodule Jido.Shell.Command.PwdTest do
   use Jido.Shell.Case, async: true
 
   alias Jido.Shell.Command.Pwd
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
 
   setup do
     {:ok, state} = State.new(%{id: "test", workspace_id: "test", cwd: "/home/user"})

@@ -2,7 +2,7 @@ defmodule Jido.Shell.Command.CatTest do
   use Jido.Shell.Case, async: false
 
   alias Jido.Shell.Command.Cat
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
   alias Jido.Shell.VFS
 
   setup do

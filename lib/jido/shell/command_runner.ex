@@ -6,14 +6,14 @@ defmodule Jido.Shell.CommandRunner do
   alias Jido.Shell.Error
   alias Jido.Shell.Command.Parser
   alias Jido.Shell.Command.Registry
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
 
   @output_bytes_key :jido_shell_command_output_bytes
 
   @doc """
   Runs a command line in the context of a session.
 
-  Called by SessionServer in a Task under CommandTaskSupervisor.
+  Called by ShellSessionServer in a Task under CommandTaskSupervisor.
   Sends messages back to the session_pid.
   """
   @spec run(pid(), State.t(), String.t(), keyword()) :: term()

@@ -1,29 +1,43 @@
-defmodule Jido.Shell.SessionServerTest do
+defmodule Jido.Shell.ShellSessionServerTest do
   use Jido.Shell.Case, async: true
 
-  alias Jido.Shell.Session
-  alias Jido.Shell.SessionServer
+  alias Jido.Shell.ShellSession
+  alias Jido.Shell.ShellSessionServer
 
   describe "start_link/1" do
     test "starts a session server" do
-      session_id = Session.generate_id()
-      {:ok, pid} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
+      session_id = ShellSession.generate_id()
+      {:ok, pid} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
       assert Process.alive?(pid)
     end
 
     test "registers with SessionRegistry" do
-      session_id = Session.generate_id()
-      {:ok, _pid} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      assert {:ok, _pid} = Session.lookup(session_id)
+      session_id = ShellSession.generate_id()
+      {:ok, _pid} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      assert {:ok, _pid} = ShellSession.lookup(session_id)
+    end
+
+    test "accepts explicit backend configuration" do
+      session_id = ShellSession.generate_id()
+
+      {:ok, _pid} =
+        ShellSessionServer.start_link(
+          session_id: session_id,
+          workspace_id: "test",
+          backend: {Jido.Shell.Backend.Local, %{}}
+        )
+
+      {:ok, state} = ShellSessionServer.get_state(session_id)
+      assert state.backend == Jido.Shell.Backend.Local
     end
   end
 
   describe "get_state/1" do
     test "returns the session state" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test_ws")
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test_ws")
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
 
       assert state.id == session_id
       assert state.workspace_id == "test_ws"
@@ -31,48 +45,56 @@ defmodule Jido.Shell.SessionServerTest do
     end
 
     test "respects initial options" do
-      session_id = Session.generate_id()
+      session_id = ShellSession.generate_id()
 
       {:ok, _} =
-        SessionServer.start_link(
+        ShellSessionServer.start_link(
           session_id: session_id,
           workspace_id: "test",
           cwd: "/home/user",
           env: %{"FOO" => "bar"}
         )
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
 
       assert state.cwd == "/home/user"
       assert state.env == %{"FOO" => "bar"}
+    end
+
+    test "returns canonical state identity" do
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test_ws")
+
+      assert {:ok, %Jido.Shell.ShellSession.State{} = state} = ShellSessionServer.get_state(session_id)
+      assert state.__struct__ == Jido.Shell.ShellSession.State
     end
   end
 
   describe "subscribe/3 and unsubscribe/2" do
     test "subscribes transport to events" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
 
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       assert MapSet.member?(state.transports, self())
     end
 
     test "unsubscribes transport" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
 
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
-      {:ok, :unsubscribed} = SessionServer.unsubscribe(session_id, self())
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
+      {:ok, :unsubscribed} = ShellSessionServer.unsubscribe(session_id, self())
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       refute MapSet.member?(state.transports, self())
     end
 
     test "removes transport when it crashes" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
 
       transport =
         spawn(fn ->
@@ -81,68 +103,68 @@ defmodule Jido.Shell.SessionServerTest do
           end
         end)
 
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, transport)
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, transport)
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       assert MapSet.member?(state.transports, transport)
 
       Process.exit(transport, :kill)
       Process.sleep(10)
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       refute MapSet.member?(state.transports, transport)
     end
   end
 
   describe "run_command/3" do
     test "adds command to history and broadcasts events" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "echo hello")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo hello")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "echo hello"}}
       assert_receive {:jido_shell_session, ^session_id, {:output, "hello\n"}}
       assert_receive {:jido_shell_session, ^session_id, :command_done}
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       assert "echo hello" in state.history
     end
 
     test "broadcasts error for unknown command" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "unknown_cmd")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "unknown_cmd")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "unknown_cmd"}}
       assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}}
     end
 
     test "broadcasts busy error when command already running" do
-      session_id = Session.generate_id()
-      {:ok, _server_pid} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      session_id = ShellSession.generate_id()
+      {:ok, _server_pid} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "sleep 5")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 5")
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 5"}}
 
       assert {:error, %Jido.Shell.Error{code: {:shell, :busy}}} =
-               SessionServer.run_command(session_id, "echo second")
+               ShellSessionServer.run_command(session_id, "echo second")
 
       assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :busy}}}}
 
-      {:ok, :cancelled} = SessionServer.cancel(session_id)
+      {:ok, :cancelled} = ShellSessionServer.cancel(session_id)
     end
 
     test "executes pwd command with session cwd" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test", cwd: "/home/user")
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test", cwd: "/home/user")
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "pwd")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "pwd")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "pwd"}}
       assert_receive {:jido_shell_session, ^session_id, {:output, "/home/user\n"}}
@@ -150,23 +172,23 @@ defmodule Jido.Shell.SessionServerTest do
     end
 
     test "clears current_command after completion" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "echo test")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo test")
 
       assert_receive {:jido_shell_session, ^session_id, :command_done}
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       assert state.current_command == nil
     end
 
     test "handles cast-based command execution and cancellation paths" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
-      {:ok, server_pid} = Session.lookup(session_id)
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
+      {:ok, server_pid} = ShellSession.lookup(session_id)
 
       GenServer.cast(server_pid, {:run_command, "echo cast", []})
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "echo cast"}}
@@ -175,19 +197,19 @@ defmodule Jido.Shell.SessionServerTest do
 
       # Idle cancel cast should be a no-op with explicit invalid transition handling internally.
       GenServer.cast(server_pid, :cancel)
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       assert state.current_command == nil
     end
 
     test "broadcasts command_crashed when monitored command exits unexpectedly" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
-      {:ok, server_pid} = Session.lookup(session_id)
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
+      {:ok, server_pid} = ShellSession.lookup(session_id)
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "sleep 1")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 1")
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 1"}}
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       assert %{ref: ref, task: task_pid} = state.current_command
 
       send(server_pid, {:DOWN, ref, :process, task_pid, :boom})
@@ -195,14 +217,14 @@ defmodule Jido.Shell.SessionServerTest do
     end
 
     test "ignores late command events and late finished messages after cancellation" do
-      session_id = Session.generate_id()
-      {:ok, _} = SessionServer.start_link(session_id: session_id, workspace_id: "test")
-      {:ok, server_pid} = Session.lookup(session_id)
+      session_id = ShellSession.generate_id()
+      {:ok, _} = ShellSessionServer.start_link(session_id: session_id, workspace_id: "test")
+      {:ok, server_pid} = ShellSession.lookup(session_id)
 
       send(server_pid, {:command_event, {:output, "late"}})
       send(server_pid, {:command_finished, {:ok, nil}})
 
-      {:ok, state} = SessionServer.get_state(session_id)
+      {:ok, state} = ShellSessionServer.get_state(session_id)
       assert state.current_command == nil
     end
   end
@@ -212,24 +234,24 @@ defmodule Jido.Shell.SessionServerTest do
       missing = "missing-session"
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
-               SessionServer.subscribe(missing, self())
+               ShellSessionServer.subscribe(missing, self())
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
-               SessionServer.unsubscribe(missing, self())
+               ShellSessionServer.unsubscribe(missing, self())
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
-               SessionServer.get_state(missing)
+               ShellSessionServer.get_state(missing)
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
-               SessionServer.run_command(missing, "echo hi")
+               ShellSessionServer.run_command(missing, "echo hi")
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
-               SessionServer.cancel(missing)
+               ShellSessionServer.cancel(missing)
     end
 
     test "returns invalid session ID errors for malformed identifiers" do
       assert {:error, %Jido.Shell.Error{code: {:session, :invalid_session_id}}} =
-               SessionServer.get_state(nil)
+               ShellSessionServer.get_state(nil)
     end
 
     test "handles registry entries that are not live session servers" do
@@ -250,7 +272,7 @@ defmodule Jido.Shell.SessionServerTest do
       assert Process.alive?(pid)
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
-               SessionServer.get_state(session_id)
+               ShellSessionServer.get_state(session_id)
     end
   end
 end

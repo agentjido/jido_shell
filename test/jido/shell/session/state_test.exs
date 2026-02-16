@@ -1,7 +1,7 @@
-defmodule Jido.Shell.Session.StateTest do
+defmodule Jido.Shell.ShellSession.StateTest do
   use Jido.Shell.Case, async: true
 
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
 
   describe "schema/0" do
     test "returns the Zoi schema" do
@@ -25,6 +25,8 @@ defmodule Jido.Shell.Session.StateTest do
       assert state.meta == %{}
       assert state.transports == MapSet.new()
       assert state.current_command == nil
+      assert state.backend == Jido.Shell.Backend.Local
+      assert state.backend_state == nil
     end
 
     test "allows overriding defaults" do
@@ -203,7 +205,7 @@ defmodule Jido.Shell.Session.StateTest do
 
     test "has the expected struct name" do
       {:ok, state} = State.new(%{id: "s", workspace_id: "w"})
-      assert state.__struct__ == Jido.Shell.Session.State
+      assert state.__struct__ == Jido.Shell.ShellSession.State
     end
   end
 end

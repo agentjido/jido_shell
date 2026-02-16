@@ -62,19 +62,49 @@ mix jido_shell --workspace my_workspace
 ### Low-Level Session API
 
 ```elixir
-{:ok, session_id} = Jido.Shell.Session.start_with_vfs("my_workspace")
-{:ok, :subscribed} = Jido.Shell.SessionServer.subscribe(session_id, self())
+{:ok, session_id} = Jido.Shell.ShellSession.start_with_vfs("my_workspace")
+{:ok, :subscribed} = Jido.Shell.ShellSessionServer.subscribe(session_id, self())
 
-{:ok, :accepted} = Jido.Shell.SessionServer.run_command(session_id, "echo hi")
+{:ok, :accepted} = Jido.Shell.ShellSessionServer.run_command(session_id, "echo hi")
 
 receive do
   {:jido_shell_session, ^session_id, {:output, chunk}} -> IO.write(chunk)
   {:jido_shell_session, ^session_id, :command_done} -> :ok
 end
 
-{:ok, :cancelled} = Jido.Shell.SessionServer.cancel(session_id)
-:ok = Jido.Shell.Session.stop(session_id)
+{:ok, :cancelled} = Jido.Shell.ShellSessionServer.cancel(session_id)
+:ok = Jido.Shell.ShellSession.stop(session_id)
 ```
+
+### Session Module Naming
+
+Canonical session modules are:
+
+- `Jido.Shell.ShellSession`
+- `Jido.Shell.ShellSessionServer`
+- `Jido.Shell.ShellSession.State`
+
+Legacy `Jido.Shell.Session*` modules remain as deprecated compatibility shims for migration.
+
+## Execution Backends
+
+Sessions run with `Jido.Shell.Backend.Local` by default.
+To execute commands on Fly.io Sprites, pass a backend tuple when starting a session:
+
+```elixir
+{:ok, session_id} =
+  Jido.Shell.ShellSession.start_with_vfs("my_workspace",
+    backend:
+      {Jido.Shell.Backend.Sprite,
+       %{
+         sprite_name: "my-agent-session",
+         token: System.fetch_env!("SPRITES_TOKEN"),
+         create: true
+       }}
+  )
+```
+
+Use `create: true` for ephemeral session Sprites and `create: false` to connect to an existing Sprite by name.
 
 ## Command Chaining
 

@@ -1,7 +1,7 @@
 defmodule Jido.Shell.Command.HelpTest do
   use Jido.Shell.Case, async: true
 
-  alias Jido.Shell.Session.State
+  alias Jido.Shell.ShellSession.State
   alias Jido.Shell.Command.Help
 
   setup do

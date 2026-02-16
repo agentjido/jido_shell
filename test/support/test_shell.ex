@@ -40,8 +40,8 @@ defmodule Jido.Shell.TestShell do
   """
 
   alias Jido.Shell.Agent
-  alias Jido.Shell.Session
-  alias Jido.Shell.SessionServer
+  alias Jido.Shell.ShellSession
+  alias Jido.Shell.ShellSessionServer
   alias Jido.Shell.VFS
 
   defstruct [:session_id, :workspace_id, :owner]
@@ -72,7 +72,7 @@ defmodule Jido.Shell.TestShell do
     :ok = VFS.mount(workspace_id, "/", Jido.VFS.Adapter.InMemory, name: fs_name)
 
     # Create session
-    {:ok, session_id} = Session.start(workspace_id, Keyword.take(opts, [:cwd, :env]))
+    {:ok, session_id} = ShellSession.start(workspace_id, Keyword.take(opts, [:cwd, :env]))
 
     shell = %__MODULE__{
       session_id: session_id,
@@ -192,7 +192,7 @@ defmodule Jido.Shell.TestShell do
   """
   @spec exists?(t(), String.t()) :: boolean()
   def exists?(%__MODULE__{workspace_id: workspace_id, session_id: session_id}, path) do
-    {:ok, state} = SessionServer.get_state(session_id)
+    {:ok, state} = ShellSessionServer.get_state(session_id)
     full_path = resolve_path(state.cwd, path)
     VFS.exists?(workspace_id, full_path)
   end
@@ -200,9 +200,9 @@ defmodule Jido.Shell.TestShell do
   @doc """
   Gets the session state.
   """
-  @spec state(t()) :: Jido.Shell.Session.State.t()
+  @spec state(t()) :: Jido.Shell.ShellSession.State.t()
   def state(%__MODULE__{session_id: session_id}) do
-    {:ok, state} = SessionServer.get_state(session_id)
+    {:ok, state} = ShellSessionServer.get_state(session_id)
     state
   end
 
@@ -221,7 +221,7 @@ defmodule Jido.Shell.TestShell do
   """
   @spec subscribe(t()) :: :ok | {:error, term()}
   def subscribe(%__MODULE__{session_id: session_id}) do
-    case SessionServer.subscribe(session_id, self()) do
+    case ShellSessionServer.subscribe(session_id, self()) do
       {:ok, :subscribed} -> :ok
       {:error, _} = error -> error
     end
@@ -232,7 +232,7 @@ defmodule Jido.Shell.TestShell do
   """
   @spec unsubscribe(t()) :: :ok | {:error, term()}
   def unsubscribe(%__MODULE__{session_id: session_id}) do
-    case SessionServer.unsubscribe(session_id, self()) do
+    case ShellSessionServer.unsubscribe(session_id, self()) do
       {:ok, :unsubscribed} -> :ok
       {:error, _} = error -> error
     end
@@ -243,7 +243,7 @@ defmodule Jido.Shell.TestShell do
   """
   @spec run_async(t(), String.t()) :: :ok | {:error, term()}
   def run_async(%__MODULE__{session_id: session_id}, command) do
-    case SessionServer.run_command(session_id, command) do
+    case ShellSessionServer.run_command(session_id, command) do
       {:ok, :accepted} -> :ok
       {:error, _} = error -> error
     end
@@ -254,7 +254,7 @@ defmodule Jido.Shell.TestShell do
   """
   @spec cancel(t()) :: :ok | {:error, term()}
   def cancel(%__MODULE__{session_id: session_id}) do
-    case SessionServer.cancel(session_id) do
+    case ShellSessionServer.cancel(session_id) do
       {:ok, :cancelled} -> :ok
       {:error, _} = error -> error
     end
@@ -313,8 +313,8 @@ defmodule Jido.Shell.TestShell do
 
   defp cleanup(%__MODULE__{session_id: session_id, workspace_id: workspace_id}) do
     # Stop session if still running
-    case Session.lookup(session_id) do
-      {:ok, _} -> Session.stop(session_id)
+    case ShellSession.lookup(session_id) do
+      {:ok, _} -> ShellSession.stop(session_id)
       {:error, :not_found} -> :ok
     end
 

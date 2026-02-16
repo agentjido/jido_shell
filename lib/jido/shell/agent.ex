@@ -23,8 +23,8 @@ defmodule Jido.Shell.Agent do
 
   """
 
-  alias Jido.Shell.Session
-  alias Jido.Shell.SessionServer
+  alias Jido.Shell.ShellSession
+  alias Jido.Shell.ShellSessionServer
 
   @type session :: String.t()
   @type workspace_id :: String.t()
@@ -39,7 +39,7 @@ defmodule Jido.Shell.Agent do
   def new(workspace_id, opts \\ [])
 
   def new(workspace_id, opts) when is_binary(workspace_id) do
-    Session.start_with_vfs(workspace_id, opts)
+    ShellSession.start_with_vfs(workspace_id, opts)
   end
 
   def new(workspace_id, _opts) do
@@ -61,17 +61,17 @@ defmodule Jido.Shell.Agent do
     timeout = Keyword.get(opts, :timeout, 30_000)
     command_opts = Keyword.drop(opts, [:timeout])
 
-    case SessionServer.subscribe(session_id, self()) do
+    case ShellSessionServer.subscribe(session_id, self()) do
       {:ok, :subscribed} ->
         drain_session_events(session_id)
 
         result =
-          case SessionServer.run_command(session_id, command, command_opts) do
+          case ShellSessionServer.run_command(session_id, command, command_opts) do
             {:ok, :accepted} -> collect_output(session_id, [], timeout, false)
             {:error, _} = error -> error
           end
 
-        _ = SessionServer.unsubscribe(session_id, self())
+        _ = ShellSessionServer.unsubscribe(session_id, self())
         result
 
       {:error, _} = error ->
@@ -94,7 +94,7 @@ defmodule Jido.Shell.Agent do
   """
   @spec read_file(session(), String.t()) :: {:ok, binary()} | {:error, Jido.Shell.Error.t()}
   def read_file(session_id, path) do
-    with {:ok, state} <- SessionServer.get_state(session_id) do
+    with {:ok, state} <- ShellSessionServer.get_state(session_id) do
       full_path = resolve_path(state.cwd, path)
       Jido.Shell.VFS.read_file(state.workspace_id, full_path)
     end
@@ -105,7 +105,7 @@ defmodule Jido.Shell.Agent do
   """
   @spec write_file(session(), String.t(), binary()) :: :ok | {:error, Jido.Shell.Error.t()}
   def write_file(session_id, path, content) do
-    with {:ok, state} <- SessionServer.get_state(session_id) do
+    with {:ok, state} <- ShellSessionServer.get_state(session_id) do
       full_path = resolve_path(state.cwd, path)
       Jido.Shell.VFS.write_file(state.workspace_id, full_path, content)
     end
@@ -116,7 +116,7 @@ defmodule Jido.Shell.Agent do
   """
   @spec list_dir(session(), String.t()) :: {:ok, [map()]} | {:error, Jido.Shell.Error.t()}
   def list_dir(session_id, path \\ ".") do
-    with {:ok, state} <- SessionServer.get_state(session_id) do
+    with {:ok, state} <- ShellSessionServer.get_state(session_id) do
       full_path = resolve_path(state.cwd, path)
       Jido.Shell.VFS.list_dir(state.workspace_id, full_path)
     end
@@ -125,9 +125,9 @@ defmodule Jido.Shell.Agent do
   @doc """
   Gets the current session state.
   """
-  @spec state(session()) :: {:ok, Jido.Shell.Session.State.t()}
+  @spec state(session()) :: {:ok, Jido.Shell.ShellSession.State.t()}
   def state(session_id) do
-    SessionServer.get_state(session_id)
+    ShellSessionServer.get_state(session_id)
   end
 
   @doc """
@@ -145,7 +145,7 @@ defmodule Jido.Shell.Agent do
   """
   @spec stop(session()) :: :ok | {:error, :not_found}
   def stop(session_id) do
-    Session.stop(session_id)
+    ShellSession.stop(session_id)
   end
 
   # === Private ===

@@ -2,9 +2,9 @@ defmodule Jido.Shell.Command.MkdirTest do
   use Jido.Shell.Case, async: false
 
   alias Jido.Shell.Command.Mkdir
-  alias Jido.Shell.Session
-  alias Jido.Shell.Session.State
-  alias Jido.Shell.SessionServer
+  alias Jido.Shell.ShellSession
+  alias Jido.Shell.ShellSession.State
+  alias Jido.Shell.ShellSessionServer
   alias Jido.Shell.VFS
 
   setup do
@@ -100,10 +100,10 @@ defmodule Jido.Shell.Command.MkdirTest do
 
   describe "integration with session" do
     test "mkdir creates directories via session", %{workspace_id: workspace_id} do
-      {:ok, session_id} = Session.start(workspace_id)
-      {:ok, :subscribed} = SessionServer.subscribe(session_id, self())
+      {:ok, session_id} = ShellSession.start(workspace_id)
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
-      {:ok, :accepted} = SessionServer.run_command(session_id, "mkdir /testdir")
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "mkdir /testdir")
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}
       assert_receive {:jido_shell_session, ^session_id, {:output, "created: /testdir\n"}}
