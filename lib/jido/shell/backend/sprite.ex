@@ -143,7 +143,7 @@ defmodule Jido.Shell.Backend.Sprite do
   end
 
   defp build_client(sprites_module, token, base_url) do
-    opts = if is_binary(base_url), do: [base_url: base_url], else: []
+    opts = if is_binary(base_url) and String.trim(base_url) != "", do: [base_url: base_url], else: []
 
     invoke_any(sprites_module, [
       {:client, [token, opts]},
