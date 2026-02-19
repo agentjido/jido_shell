@@ -72,7 +72,7 @@ defmodule Jido.Shell.MixProject do
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.14"},
       {:jido_vfs, github: "agentjido/hako"},
-      {:sprites, git: "https://github.com/superfly/sprites-ex.git", optional: true},
+      {:sprites, git: "https://github.com/mikehostetler/sprites-ex.git", optional: true},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
