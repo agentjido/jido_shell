@@ -428,7 +428,6 @@ defmodule Jido.Shell.Backend.Sprite do
   defp close_remote_handle(state, cmd_ref) do
     _ = invoke_any(state.sprites_module, [{:close_stdin, [cmd_ref]}])
     _ = invoke_any(state.sprites_module, [{:kill, [cmd_ref]}])
-    _ = invoke_any(state.sprites_module, [{:await, [cmd_ref]}])
     :ok
   end
 
@@ -440,10 +439,14 @@ defmodule Jido.Shell.Backend.Sprite do
   defp spawn_opts(cwd, env, timeout) do
     []
     |> Keyword.put(:dir, cwd)
-    |> Keyword.put(:env, env)
+    |> Keyword.put(:env, env_to_tuples(env))
     |> maybe_put(:timeout, timeout)
     |> Keyword.put(:stderr_to_stdout, false)
   end
+
+  defp env_to_tuples(env) when is_map(env), do: Enum.to_list(env)
+  defp env_to_tuples(env) when is_list(env), do: env
+  defp env_to_tuples(_), do: []
 
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)

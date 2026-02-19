@@ -59,7 +59,13 @@ defmodule Jido.Shell.Agent do
   @spec run(session(), String.t(), keyword()) :: result()
   def run(session_id, command, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, 30_000)
-    command_opts = Keyword.drop(opts, [:timeout])
+
+    command_opts =
+      opts
+      |> Keyword.drop([:timeout])
+      |> Keyword.update(:execution_context, %{max_runtime_ms: timeout}, fn ctx ->
+        Map.put_new(ctx, :max_runtime_ms, timeout)
+      end)
 
     case ShellSessionServer.subscribe(session_id, self()) do
       {:ok, :subscribed} ->
