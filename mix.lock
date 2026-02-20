@@ -52,7 +52,7 @@
   "sourceror": {:hex, :sourceror, "1.10.1", "325753ed460fe9fa34ebb4deda76d57b2e1507dcd78a5eb9e1c41bfb78b7cdfe", [:mix], [], "hexpm", "288f3079d93865cd1e3e20df5b884ef2cb440e0e03e8ae393624ee8a770ba588"},
   "spitfire": {:hex, :spitfire, "0.3.5", "6e5a775256fec72d8a4f4bb19eb8b91ad64b6f64dc51b1c8b9689e78b16c6e8b", [:mix], [], "hexpm", "7ffcb11de2f6544868148f8fc996482040eb329a990e1624795e53598934a680"},
   "splode": {:hex, :splode, "0.2.9", "3a2776e187c82f42f5226b33b1220ccbff74f4bcc523dd4039c804caaa3ffdc7", [:mix], [], "hexpm", "8002b00c6e24f8bd1bcced3fbaa5c33346048047bb7e13d2f3ad428babbd95c3"},
-  "sprites": {:git, "https://github.com/superfly/sprites-ex.git", "80916380b78331a85cf621229d27b7236e027804", []},
+  "sprites": {:git, "https://github.com/mikehostetler/sprites-ex.git", "74e66c6c37d99d187d83988cdbd8ec5424e37642", []},
   "ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.7", "354c321cf377240c7b8716899e182ce4890c5938111a1296add3ec74cf1715df", [:make, :mix, :rebar3], [], "hexpm", "fe4c190e8f37401d30167c8c405eda19469f34577987c76dde613e838bbc67f8"},
   "stream_data": {:hex, :stream_data, "1.2.0", "58dd3f9e88afe27dc38bef26fce0c84a9e7a96772b2925c7b32cd2435697a52b", [:mix], [], "hexpm", "eb5c546ee3466920314643edf68943a5b14b32d1da9fe01698dc92b73f89a9ed"},
   "sweet_xml": {:hex, :sweet_xml, "0.7.5", "803a563113981aaac202a1dbd39771562d0ad31004ddbfc9b5090bdcd5605277", [:mix], [], "hexpm", "193b28a9b12891cae351d81a0cead165ffe67df1b73fe5866d10629f4faefb12"},
@@ -61,5 +61,5 @@
   "text_diff": {:hex, :text_diff, "0.1.0", "1caf3175e11a53a9a139bc9339bd607c47b9e376b073d4571c031913317fecaa", [:mix], [], "hexpm", "d1ffaaecab338e49357b6daa82e435f877e0649041ace7755583a0ea3362dbd7"},
   "unicode_util_compat": {:hex, :unicode_util_compat, "0.7.1", "a48703a25c170eedadca83b11e88985af08d35f37c6f664d6dcfb106a97782fc", [:rebar3], [], "hexpm", "b3a917854ce3ae233619744ad1e0102e05673136776fb2fa76234f3e03b23642"},
   "uniq": {:hex, :uniq, "0.6.2", "51846518c037134c08bc5b773468007b155e543d53c8b39bafe95b0af487e406", [:mix], [{:ecto, "~> 3.0", [hex: :ecto, repo: "hexpm", optional: true]}], "hexpm", "95aa2a41ea331ef0a52d8ed12d3e730ef9af9dbc30f40646e6af334fbd7bc0fc"},
-  "zoi": {:hex, :zoi, "0.14.0", "d193e9d31b2cabb674f369c2ffcc1b1397780914b0718e8dd2a8c032962a0168", [:mix], [{:decimal, "~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}, {:phoenix_html, "~> 2.14.2 or ~> 3.0 or ~> 4.1", [hex: :phoenix_html, repo: "hexpm", optional: true]}], "hexpm", "745bf18af7905f55d98d3f1ad5bf8aafb5c2d184f220cb3433f0d83738ebb917"},
+  "zoi": {:hex, :zoi, "0.17.1", "406aa87bb4181f41dee64336b75434367b7d3e88db813b0e6db0ae2d0f81f743", [:mix], [{:decimal, "~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}, {:phoenix_html, "~> 2.14.2 or ~> 3.0 or ~> 4.1", [hex: :phoenix_html, repo: "hexpm", optional: true]}], "hexpm", "3a11bf3bc9189f988ac74e81b5d7ca0c689b2a20eed220746a7043aa528e2aab"},
 }

@@ -70,8 +70,8 @@ defmodule Jido.Shell.MixProject do
       # Runtime dependencies
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
-      {:zoi, "~> 0.14"},
-      {:jido_vfs, github: "agentjido/hako"},
+      {:zoi, "~> 0.17"},
+      vfs_dep(),
       {:sprites, git: "https://github.com/mikehostetler/sprites-ex.git", optional: true},
 
       # Dev/Test dependencies
@@ -87,6 +87,14 @@ defmodule Jido.Shell.MixProject do
       # Code generation
       {:igniter, "~> 0.7", optional: true}
     ]
+  end
+
+  defp vfs_dep do
+    if File.dir?("../jido_vfs") do
+      {:jido_vfs, path: "../jido_vfs", override: true}
+    else
+      {:jido_vfs, github: "agentjido/hako"}
+    end
   end
 
   defp aliases do
