@@ -26,6 +26,7 @@ defmodule Jido.Shell.MixProject do
       dialyzer: [
         plt_local_path: "priv/plts/project.plt",
         plt_core_path: "priv/plts/core.plt",
+        plt_add_apps: [:mix],
         flags: [:error_handling, :unknown],
         ignore_warnings: ".dialyzer_ignore.exs"
       ],
@@ -96,6 +97,7 @@ defmodule Jido.Shell.MixProject do
       q: ["quality"],
       quality: [
         "format --check-formatted",
+        "jido_shell.guardrails",
         "compile --warnings-as-errors",
         "credo --min-priority higher",
         "dialyzer"

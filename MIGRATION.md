@@ -24,14 +24,14 @@ Legacy module shims were removed:
 
 ### Example update
 
-Before:
+Before (legacy API reference, no longer supported):
 
 ```elixir
 {:ok, session_id} = Jido.Shell.Session.start_with_vfs("my_workspace")
 {:ok, :accepted} = Jido.Shell.SessionServer.run_command(session_id, "echo hi")
 ```
 
-After:
+After (canonical API):
 
 ```elixir
 {:ok, session_id} = Jido.Shell.ShellSession.start_with_vfs("my_workspace")
