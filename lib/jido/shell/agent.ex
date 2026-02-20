@@ -73,7 +73,7 @@ defmodule Jido.Shell.Agent do
 
         result =
           case ShellSessionServer.run_command(session_id, command, command_opts) do
-            {:ok, :accepted} -> collect_output(session_id, [], timeout, false)
+            {:ok, :accepted} -> collect_output(session_id, command, [], timeout, false)
             {:error, _} = error -> error
           end
 
@@ -156,19 +156,19 @@ defmodule Jido.Shell.Agent do
 
   # === Private ===
 
-  defp collect_output(session_id, acc, timeout, started?) do
+  defp collect_output(session_id, expected_command, acc, timeout, started?) do
     receive do
-      {:jido_shell_session, ^session_id, {:command_started, _}} ->
-        collect_output(session_id, acc, timeout, true)
+      {:jido_shell_session, ^session_id, {:command_started, ^expected_command}} ->
+        collect_output(session_id, expected_command, acc, timeout, true)
 
       {:jido_shell_session, ^session_id, _event} when not started? ->
-        collect_output(session_id, acc, timeout, started?)
+        collect_output(session_id, expected_command, acc, timeout, started?)
 
       {:jido_shell_session, ^session_id, {:output, chunk}} ->
-        collect_output(session_id, [chunk | acc], timeout, started?)
+        collect_output(session_id, expected_command, [chunk | acc], timeout, started?)
 
       {:jido_shell_session, ^session_id, {:cwd_changed, _}} ->
-        collect_output(session_id, acc, timeout, started?)
+        collect_output(session_id, expected_command, acc, timeout, started?)
 
       {:jido_shell_session, ^session_id, :command_done} ->
         output = acc |> Enum.reverse() |> Enum.join()

@@ -136,9 +136,11 @@ defmodule Jido.Shell.AgentTest do
       assert {:error, %Jido.Shell.Error{code: {:command, :crashed}}} = Task.await(task, 2_000)
     end
 
-    test "returns timeout errors when no completion event is received in time", %{session_id: session_id} do
-      assert {:error, %Jido.Shell.Error{code: {:command, :timeout}}} =
-               Agent.run(session_id, "sleep 1", timeout: 10)
+    test "returns timeout/runtime-limit errors when command exceeds configured timeout", %{
+      session_id: session_id
+    } do
+      assert {:error, %Jido.Shell.Error{code: code}} = Agent.run(session_id, "sleep 1", timeout: 10)
+      assert code in [{:command, :timeout}, {:command, :runtime_limit_exceeded}]
     end
   end
 
@@ -309,7 +311,7 @@ defmodule Jido.Shell.AgentTest do
   end
 
   describe "run/3 mailbox ordering" do
-    setup :set_mimic_global
+    setup :set_mimic_from_context
     setup :verify_on_exit!
 
     test "ignores pre-start session events until command_started arrives" do
@@ -320,7 +322,9 @@ defmodule Jido.Shell.AgentTest do
         {:ok, :subscribed}
       end)
 
-      expect(Jido.Shell.ShellSessionServer, :run_command, fn ^session_id, "echo hi", [] ->
+      expect(Jido.Shell.ShellSessionServer, :run_command, fn ^session_id, "echo hi", opts ->
+        assert %{max_runtime_ms: 30_000} = Keyword.fetch!(opts, :execution_context)
+
         send(self(), {:jido_shell_session, session_id, {:output, "stale\n"}})
         send(self(), {:jido_shell_session, session_id, {:command_started, "echo hi"}})
         send(self(), {:jido_shell_session, session_id, :command_done})

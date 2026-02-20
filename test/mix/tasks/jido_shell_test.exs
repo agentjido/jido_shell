@@ -2,7 +2,7 @@ defmodule Mix.Tasks.JidoShellTest do
   use ExUnit.Case, async: false
   import Mimic
 
-  setup :set_mimic_global
+  setup :set_mimic_from_context
   setup :verify_on_exit!
 
   test "runs interactive shell with default workspace" do
