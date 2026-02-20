@@ -10,7 +10,7 @@ Jido.Shell provides an Elixir-native virtual shell with in-memory filesystems, s
 
 ## Features
 
-- Virtual filesystem with [Jido.VFS](https://github.com/agentjido/hako) adapter support
+- Virtual filesystem with [Jido.VFS](https://github.com/agentjido/jido_vfs) adapter support
 - Unix-like built-in commands (`ls`, `cd`, `cat`, `write`, `rm`, `cp`, `env`, `bash`)
 - Session-scoped state (`cwd`, env vars, history)
 - Streaming session events (`{:jido_shell_session, session_id, event}`)
@@ -83,8 +83,6 @@ Canonical session modules are:
 - `Jido.Shell.ShellSession`
 - `Jido.Shell.ShellSessionServer`
 - `Jido.Shell.ShellSession.State`
-
-Legacy `Jido.Shell.Session*` modules remain as deprecated compatibility shims for migration.
 
 ## Execution Backends
 

@@ -10,7 +10,7 @@ Canonical session modules are now explicit:
 - `Jido.Shell.ShellSessionServer`
 - `Jido.Shell.ShellSession.State`
 
-Legacy modules are still available as deprecated compatibility shims for now:
+Legacy module shims were removed:
 
 - `Jido.Shell.Session`
 - `Jido.Shell.SessionServer`
@@ -41,7 +41,7 @@ After:
 ### Struct identity note
 
 State identity is now canonicalized as `%Jido.Shell.ShellSession.State{}`.
-`Jido.Shell.Session.State` delegates to the new module, but callers should update type specs and pattern matches to `Jido.Shell.ShellSession.State`.
+Callers should use `Jido.Shell.ShellSession.State` in type specs and pattern matches.
 
 ## 2. Workspace IDs Are Strings
 

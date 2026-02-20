@@ -49,7 +49,7 @@ git commit -m "docs: update migration guide"
 
 ## Adding Commands
 
-1. Add a module under `lib/jido/shell/command/` implementing `Jido.Shell.Command`.
+1. Add a module under `lib/jido_shell/command/` implementing `Jido.Shell.Command`.
 2. Register it in `Jido.Shell.Command.Registry`.
 3. Add tests under `test/jido/shell/command/`.
 4. Update `README.md` command docs.

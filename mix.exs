@@ -9,7 +9,7 @@ defmodule Jido.Shell.MixProject do
     [
       app: :jido_shell,
       version: @version,
-      elixir: "~> 1.17",
+      elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -71,7 +71,7 @@ defmodule Jido.Shell.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.17"},
-      vfs_dep(),
+      {:jido_vfs, github: "agentjido/jido_vfs"},
       {:sprites, git: "https://github.com/mikehostetler/sprites-ex.git", optional: true},
 
       # Dev/Test dependencies
@@ -87,14 +87,6 @@ defmodule Jido.Shell.MixProject do
       # Code generation
       {:igniter, "~> 0.7", optional: true}
     ]
-  end
-
-  defp vfs_dep do
-    if File.dir?("../jido_vfs") do
-      {:jido_vfs, path: "../jido_vfs", override: true}
-    else
-      {:jido_vfs, github: "agentjido/hako"}
-    end
   end
 
   defp aliases do
@@ -147,11 +139,6 @@ defmodule Jido.Shell.MixProject do
           Jido.Shell.ShellSessionServer,
           Jido.Shell.ShellSession.State,
           Jido.Shell.Error
-        ],
-        Deprecated: [
-          Jido.Shell.Session,
-          Jido.Shell.SessionServer,
-          Jido.Shell.Session.State
         ],
         Backends: [
           Jido.Shell.Backend.Local,

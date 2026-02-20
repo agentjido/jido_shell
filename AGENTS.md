@@ -38,8 +38,6 @@ Jido.Shell.Supervisor
 - `Jido.Shell.VFS` - mounted filesystem router
 - `Jido.Shell.Transport.IEx` - interactive shell transport
 
-Deprecated compatibility shims: `Jido.Shell.Session`, `Jido.Shell.SessionServer`, `Jido.Shell.Session.State`.
-
 ## Session Events
 
 ```elixir
@@ -64,6 +62,7 @@ Events:
 
 ## Conventions
 
+- Source layout: `lib/jido_shell.ex` and `lib/jido_shell/**/*.ex`
 - Prefer tuple-based APIs: `{:ok, ...}` / `{:error, ...}`
 - Use `Jido.Shell.Error` for structured errors
 - Keep workspace IDs as strings (`String.t()`)
