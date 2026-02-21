@@ -72,7 +72,7 @@ defmodule Jido.Shell.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.17"},
-      {:jido_vfs, github: "agentjido/jido_vfs"},
+      {:jido_vfs, github: "agentjido/jido_vfs", branch: "main"},
       {:sprites, git: "https://github.com/mikehostetler/sprites-ex.git", optional: true},
 
       # Dev/Test dependencies

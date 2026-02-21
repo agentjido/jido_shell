@@ -209,3 +209,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## Package Purpose
+
+`jido_shell` is the shell/session execution layer for Jido, including backend abstraction (local/sprite), command execution helpers, and shell-side runtime tooling.
+
+## Testing Paths
+
+- Unit/integration-lite tests: `mix test`
+- Full quality gate: `mix quality`
+- Optional flaky cases: `mix test --include flaky`
