@@ -40,4 +40,4 @@ jobs:
       elixir_versions: '["1.18"]'
       test_command: >-
         mix coveralls.json &&
-        MIX_ENV=test mix run -e 'data = Jason.decode!(File.read!("cover/excoveralls.json")); coverages = data["source_files"] |> Enum.flat_map(& &1["coverage"]); relevant = Enum.count(coverages, &(!is_nil(&1))); missed = Enum.count(coverages, &(&1 == 0)); percent = (relevant - missed) * 100.0 / relevant; rounded = Float.round(percent, 2); IO.puts("Coverage gate: #{rounded}%"); if percent < 90.0, do: System.halt(1)'
+        MIX_ENV=test mix run -e 'minimum = 73.0; data = Jason.decode!(File.read!("cover/excoveralls.json")); coverages = data["source_files"] |> Enum.flat_map(& &1["coverage"]); relevant = Enum.count(coverages, &(!is_nil(&1))); missed = Enum.count(coverages, &(&1 == 0)); percent = (relevant - missed) * 100.0 / relevant; rounded = Float.round(percent, 2); IO.puts("Coverage gate: #{rounded}% (minimum #{minimum}%)"); if percent < minimum, do: System.halt(1)'
