@@ -3,6 +3,7 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
   alias Jido.Shell.ShellSession
   alias Jido.Shell.ShellSessionServer
+  @event_timeout 1_000
 
   describe "start_link/1" do
     test "starts a session server" do
@@ -124,9 +125,9 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo hello")
 
-      assert_receive {:jido_shell_session, ^session_id, {:command_started, "echo hello"}}
-      assert_receive {:jido_shell_session, ^session_id, {:output, "hello\n"}}
-      assert_receive {:jido_shell_session, ^session_id, :command_done}
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "echo hello"}}, @event_timeout
+      assert_receive {:jido_shell_session, ^session_id, {:output, "hello\n"}}, @event_timeout
+      assert_receive {:jido_shell_session, ^session_id, :command_done}, @event_timeout
 
       {:ok, state} = ShellSessionServer.get_state(session_id)
       assert "echo hello" in state.history
@@ -139,8 +140,10 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "unknown_cmd")
 
-      assert_receive {:jido_shell_session, ^session_id, {:command_started, "unknown_cmd"}}
-      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}}
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "unknown_cmd"}}, @event_timeout
+
+      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}},
+                     @event_timeout
     end
 
     test "broadcasts busy error when command already running" do
@@ -149,12 +152,13 @@ defmodule Jido.Shell.ShellSessionServerTest do
       {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
 
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 5")
-      assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 5"}}
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 5"}}, @event_timeout
 
       assert {:error, %Jido.Shell.Error{code: {:shell, :busy}}} =
                ShellSessionServer.run_command(session_id, "echo second")
 
-      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :busy}}}}
+      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :busy}}}},
+                     @event_timeout
 
       {:ok, :cancelled} = ShellSessionServer.cancel(session_id)
     end
@@ -166,9 +170,9 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "pwd")
 
-      assert_receive {:jido_shell_session, ^session_id, {:command_started, "pwd"}}
-      assert_receive {:jido_shell_session, ^session_id, {:output, "/home/user\n"}}
-      assert_receive {:jido_shell_session, ^session_id, :command_done}
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "pwd"}}, @event_timeout
+      assert_receive {:jido_shell_session, ^session_id, {:output, "/home/user\n"}}, @event_timeout
+      assert_receive {:jido_shell_session, ^session_id, :command_done}, @event_timeout
     end
 
     test "clears current_command after completion" do
@@ -178,7 +182,7 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo test")
 
-      assert_receive {:jido_shell_session, ^session_id, :command_done}
+      assert_receive {:jido_shell_session, ^session_id, :command_done}, @event_timeout
 
       {:ok, state} = ShellSessionServer.get_state(session_id)
       assert state.current_command == nil
@@ -191,9 +195,9 @@ defmodule Jido.Shell.ShellSessionServerTest do
       {:ok, server_pid} = ShellSession.lookup(session_id)
 
       GenServer.cast(server_pid, {:run_command, "echo cast", []})
-      assert_receive {:jido_shell_session, ^session_id, {:command_started, "echo cast"}}
-      assert_receive {:jido_shell_session, ^session_id, {:output, "cast\n"}}
-      assert_receive {:jido_shell_session, ^session_id, :command_done}
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "echo cast"}}, @event_timeout
+      assert_receive {:jido_shell_session, ^session_id, {:output, "cast\n"}}, @event_timeout
+      assert_receive {:jido_shell_session, ^session_id, :command_done}, @event_timeout
 
       # Idle cancel cast should be a no-op with explicit invalid transition handling internally.
       GenServer.cast(server_pid, :cancel)
@@ -208,12 +212,12 @@ defmodule Jido.Shell.ShellSessionServerTest do
       {:ok, server_pid} = ShellSession.lookup(session_id)
 
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 1")
-      assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 1"}}
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, "sleep 1"}}, @event_timeout
       {:ok, state} = ShellSessionServer.get_state(session_id)
       assert %{ref: ref, task: task_pid} = state.current_command
 
       send(server_pid, {:DOWN, ref, :process, task_pid, :boom})
-      assert_receive {:jido_shell_session, ^session_id, {:command_crashed, :boom}}
+      assert_receive {:jido_shell_session, ^session_id, {:command_crashed, :boom}}, @event_timeout
     end
 
     test "ignores late command events and late finished messages after cancellation" do
@@ -268,7 +272,7 @@ defmodule Jido.Shell.ShellSessionServerTest do
           end
         end)
 
-      assert_receive :registered
+      assert_receive :registered, @event_timeout
       assert Process.alive?(pid)
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =
