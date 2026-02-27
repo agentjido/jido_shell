@@ -16,11 +16,14 @@ mix test
 Run before opening a PR:
 
 ```bash
+mix jido_shell.guardrails
 mix quality
 mix test
 mix test --include flaky
 mix coveralls
 ```
+
+`mix quality` runs `mix jido_shell.guardrails` first, so namespace/layout regressions fail early in scripted workflows.
 
 ## Common Commands
 
@@ -38,6 +41,7 @@ mix docs
 2. Add tests for behavior changes.
 3. Keep docs and examples in sync.
 4. Use conventional commits.
+5. If module namespace/layout conventions change, update guardrails and guardrail tests in the same PR.
 
 Examples:
 

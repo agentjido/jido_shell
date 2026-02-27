@@ -95,6 +95,7 @@ defmodule Jido.Shell.MixProject do
       test: "test --exclude flaky",
       q: ["quality"],
       quality: [
+        "jido_shell.guardrails",
         "format --check-formatted",
         "compile --warnings-as-errors",
         "credo --min-priority higher",
