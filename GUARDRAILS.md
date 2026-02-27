@@ -25,9 +25,9 @@ When namespace conventions evolve, update guardrails in the same PR.
 
 1. Add a rule module that implements `Jido.Shell.Guardrails.Rule`.
 2. Return `:ok` or a list of `%Jido.Shell.Guardrails.Violation{}` from `check/1`.
-3. Register the rule:
-4. Add it to `Jido.Shell.Guardrails.default_rules/0`, or
-5. Configure it with `config :jido_shell, :guardrail_rules, [MyRule]`.
+3. Register the rule by either:
+4. Adding it to `Jido.Shell.Guardrails.default_rules/0`.
+5. Configuring it with `config :jido_shell, :guardrail_rules, [MyRule]`.
 6. Add tests that demonstrate both pass and fail behavior for the new convention.
 
 Example rule skeleton:
