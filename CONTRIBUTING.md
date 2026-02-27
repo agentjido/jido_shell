@@ -25,6 +25,8 @@ mix coveralls
 
 `mix quality` runs `mix jido_shell.guardrails` first, so namespace/layout regressions fail early in scripted workflows.
 
+See [GUARDRAILS.md](GUARDRAILS.md) for convention details and extension rules.
+
 ## Common Commands
 
 ```bash
