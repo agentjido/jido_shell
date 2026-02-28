@@ -1,7 +1,13 @@
-defmodule Jido.Shell.SpriteLifecycle do
+defmodule Jido.Shell.Environment.Sprite do
   @moduledoc """
-  Generic helpers for provisioning and tearing down Sprite-backed sessions.
+  Fly.io Sprite environment implementation.
+
+  Provisions Sprite-backed shell sessions and handles teardown with
+  retry-based verification. This is the default environment used by
+  `Jido.Harness.Exec.Workspace`.
   """
+
+  @behaviour Jido.Shell.Environment
 
   alias Jido.Shell.Exec
 
@@ -20,9 +26,10 @@ defmodule Jido.Shell.SpriteLifecycle do
           warnings: [String.t()] | nil
         }
 
+  @impl true
   @spec provision(String.t(), map(), keyword()) :: {:ok, provision_result()} | {:error, term()}
-  def provision(workspace_id, sprite_config, opts \\ [])
-      when is_binary(workspace_id) and is_map(sprite_config) do
+  def provision(workspace_id, config, opts \\ [])
+      when is_binary(workspace_id) and is_map(config) do
     workspace_base = Keyword.get(opts, :workspace_base, "/work")
     workspace_dir = Keyword.get(opts, :workspace_dir, "#{workspace_base}/#{workspace_id}")
     sprite_name = Keyword.get(opts, :sprite_name, workspace_id)
@@ -33,14 +40,14 @@ defmodule Jido.Shell.SpriteLifecycle do
     backend_config =
       %{
         sprite_name: sprite_name,
-        token: config_get(sprite_config, :token),
-        create: config_get(sprite_config, :create, true)
+        token: config_get(config, :token),
+        create: config_get(config, :create, true)
       }
-      |> maybe_put_base_url(config_get(sprite_config, :base_url))
+      |> maybe_put_base_url(config_get(config, :base_url))
 
     session_opts = [
       backend: {Jido.Shell.Backend.Sprite, backend_config},
-      env: config_get(sprite_config, :env, %{})
+      env: config_get(config, :env, %{})
     ]
 
     with {:ok, session_id} <- session_mod.start_with_vfs(workspace_id, session_opts),
@@ -55,6 +62,7 @@ defmodule Jido.Shell.SpriteLifecycle do
     end
   end
 
+  @impl true
   @spec teardown(String.t(), keyword()) :: teardown_result()
   def teardown(session_id, opts \\ []) when is_binary(session_id) do
     sprite_name = Keyword.get(opts, :sprite_name)

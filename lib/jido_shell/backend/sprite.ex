@@ -11,6 +11,7 @@ defmodule Jido.Shell.Backend.Sprite do
 
   @behaviour Jido.Shell.Backend
 
+  alias Jido.Shell.Backend.OutputLimiter
   alias Jido.Shell.Error
 
   @default_task_supervisor Jido.Shell.CommandTaskSupervisor
@@ -359,22 +360,15 @@ defmodule Jido.Shell.Backend.Sprite do
 
   defp emit_stream_chunk(state, cmd_ref, data, output_limit, emitted_bytes) do
     chunk = IO.iodata_to_binary(data)
-    chunk_bytes = byte_size(chunk)
-    updated_total = emitted_bytes + chunk_bytes
 
-    cond do
-      is_integer(output_limit) and output_limit > 0 and updated_total > output_limit ->
-        _ = close_remote_handle(state, cmd_ref)
-
-        {:error,
-         Error.command(:output_limit_exceeded, %{
-           emitted_bytes: updated_total,
-           max_output_bytes: output_limit
-         })}
-
-      true ->
+    case OutputLimiter.check(byte_size(chunk), emitted_bytes, output_limit) do
+      {:ok, updated_total} ->
         send(state.session_pid, {:command_event, {:output, chunk}})
         {:ok, updated_total}
+
+      {:limit_exceeded, error} ->
+        _ = close_remote_handle(state, cmd_ref)
+        {:error, error}
     end
   end
 
@@ -383,17 +377,14 @@ defmodule Jido.Shell.Backend.Sprite do
 
   defp maybe_emit_output(session_pid, output, output_limit) do
     chunk = IO.iodata_to_binary(output)
-    chunk_bytes = byte_size(chunk)
 
-    if is_integer(output_limit) and output_limit > 0 and chunk_bytes > output_limit do
-      {:error,
-       Error.command(:output_limit_exceeded, %{
-         emitted_bytes: chunk_bytes,
-         max_output_bytes: output_limit
-       })}
-    else
-      send(session_pid, {:command_event, {:output, chunk}})
-      :ok
+    case OutputLimiter.check(byte_size(chunk), 0, output_limit) do
+      {:ok, _} ->
+        send(session_pid, {:command_event, {:output, chunk}})
+        :ok
+
+      {:limit_exceeded, error} ->
+        {:error, error}
     end
   end
 
