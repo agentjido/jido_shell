@@ -1,1 +1,1 @@
-ExUnit.start(exclude: [:flaky, :sprites])
+ExUnit.start(exclude: [:flaky, :sprites, :ssh_integration])

@@ -58,7 +58,7 @@ defmodule Jido.Shell.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :ssh, :public_key],
       mod: {Jido.Shell.Application, []}
     ]
   end
@@ -144,7 +144,12 @@ defmodule Jido.Shell.MixProject do
         ],
         Backends: [
           Jido.Shell.Backend.Local,
-          Jido.Shell.Backend.Sprite
+          Jido.Shell.Backend.Sprite,
+          Jido.Shell.Backend.SSH
+        ],
+        Environments: [
+          Jido.Shell.Environment,
+          Jido.Shell.Environment.Sprite
         ],
         Commands: ~r/Jido\.Shell\.Command.*/,
         "Virtual Filesystem": [
