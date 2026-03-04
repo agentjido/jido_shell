@@ -19,6 +19,11 @@ defmodule Jido.Shell.EnvironmentTest do
   end
 
   describe "Environment.Sprite" do
+    setup do
+      assert {:module, SpriteEnv} = Code.ensure_loaded(SpriteEnv)
+      :ok
+    end
+
     test "implements Environment behaviour" do
       behaviours =
         SpriteEnv.__info__(:attributes)
@@ -38,6 +43,10 @@ defmodule Jido.Shell.EnvironmentTest do
 
     test "does not implement optional status/2" do
       refute function_exported?(SpriteEnv, :status, 2)
+    end
+
+    test "does not expose legacy SpriteLifecycle module" do
+      refute Code.ensure_loaded?(Jido.Shell.SpriteLifecycle)
     end
   end
 end

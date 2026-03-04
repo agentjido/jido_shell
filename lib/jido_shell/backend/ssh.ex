@@ -274,16 +274,12 @@ defmodule Jido.Shell.Backend.SSH do
 
     receive do
       {:ssh_cm, _conn, {:data, ^channel_id, _type, data}} ->
-        chunk = IO.iodata_to_binary(data)
-
-        case OutputLimiter.check(byte_size(chunk), emitted_bytes, output_limit) do
+        case emit_checked_output(state, channel_id, data, output_limit, emitted_bytes) do
           {:ok, updated_total} ->
-            send(state.session_pid, {:command_event, {:output, chunk}})
             await_ssh_events(state, channel_id, line, timeout, output_limit, updated_total)
 
-          {:limit_exceeded, error} ->
-            ssh_conn_mod.close(state.conn, channel_id)
-            send_finished(state.session_pid, {:error, error})
+          {:error, :output_limit_exceeded} ->
+            :ok
         end
 
       {:ssh_cm, _conn, {:exit_status, ^channel_id, 0}} ->
@@ -291,7 +287,7 @@ defmodule Jido.Shell.Backend.SSH do
 
       {:ssh_cm, _conn, {:exit_status, ^channel_id, code}} ->
         # Don't send finished yet — wait for :closed or :eof to ensure all data is flushed
-        await_ssh_close(state, channel_id, line, code)
+        await_ssh_close(state, channel_id, line, code, output_limit, emitted_bytes)
 
       {:ssh_cm, _conn, {:eof, ^channel_id}} ->
         await_ssh_events(state, channel_id, line, timeout, output_limit, emitted_bytes)
@@ -306,15 +302,19 @@ defmodule Jido.Shell.Backend.SSH do
   end
 
   # After we've received a non-zero exit_status, drain remaining data/eof/closed messages
-  defp await_ssh_close(state, channel_id, line, exit_code) do
+  defp await_ssh_close(state, channel_id, line, exit_code, output_limit, emitted_bytes) do
     receive do
       {:ssh_cm, _conn, {:data, ^channel_id, _type, data}} ->
-        chunk = IO.iodata_to_binary(data)
-        send(state.session_pid, {:command_event, {:output, chunk}})
-        await_ssh_close(state, channel_id, line, exit_code)
+        case emit_checked_output(state, channel_id, data, output_limit, emitted_bytes) do
+          {:ok, updated_total} ->
+            await_ssh_close(state, channel_id, line, exit_code, output_limit, updated_total)
+
+          {:error, :output_limit_exceeded} ->
+            :ok
+        end
 
       {:ssh_cm, _conn, {:eof, ^channel_id}} ->
-        await_ssh_close(state, channel_id, line, exit_code)
+        await_ssh_close(state, channel_id, line, exit_code, output_limit, emitted_bytes)
 
       {:ssh_cm, _conn, {:closed, ^channel_id}} ->
         send_finished(state.session_pid, {:error, Error.command(:exit_code, %{code: exit_code, line: line})})
@@ -349,6 +349,21 @@ defmodule Jido.Shell.Backend.SSH do
 
   defp command_line(command, []), do: command
   defp command_line(command, args), do: Enum.join([command | args], " ")
+
+  defp emit_checked_output(state, channel_id, data, output_limit, emitted_bytes) do
+    chunk = IO.iodata_to_binary(data)
+
+    case OutputLimiter.check(byte_size(chunk), emitted_bytes, output_limit) do
+      {:ok, updated_total} ->
+        send(state.session_pid, {:command_event, {:output, chunk}})
+        {:ok, updated_total}
+
+      {:limit_exceeded, error} ->
+        state.ssh_connection_module.close(state.conn, channel_id)
+        send_finished(state.session_pid, {:error, error})
+        {:error, :output_limit_exceeded}
+    end
+  end
 
   defp remote_command(shell, line, cwd, env) do
     env_prefix =
@@ -385,9 +400,7 @@ defmodule Jido.Shell.Backend.SSH do
   defp extract_limit(execution_context, key) when is_map(execution_context) do
     limits = Map.get(execution_context, :limits, %{})
 
-    parse_limit(
-      Map.get(limits, key, Map.get(execution_context, key, nil))
-    )
+    parse_limit(Map.get(limits, key, Map.get(execution_context, key, nil)))
   end
 
   defp extract_limit(_, _), do: nil

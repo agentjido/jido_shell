@@ -141,3 +141,25 @@ Session events are emitted as:
 ```elixir
 {:jido_shell_session, session_id, event}
 ```
+
+## 10. Sprite Lifecycle Module Renamed
+
+The lifecycle helper module was renamed and the old name was removed:
+
+- `Jido.Shell.SpriteLifecycle` -> `Jido.Shell.Environment.Sprite`
+
+### Example update
+
+Before (removed):
+
+```elixir
+{:ok, result} = Jido.Shell.SpriteLifecycle.provision(workspace_id, sprite_config)
+teardown = Jido.Shell.SpriteLifecycle.teardown(session_id, sprite_name: workspace_id)
+```
+
+After (canonical):
+
+```elixir
+{:ok, result} = Jido.Shell.Environment.Sprite.provision(workspace_id, sprite_config)
+teardown = Jido.Shell.Environment.Sprite.teardown(session_id, sprite_name: workspace_id)
+```

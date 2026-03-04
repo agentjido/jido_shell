@@ -55,6 +55,18 @@ defmodule Jido.Shell.Backend.SSHTest do
           send(caller, {:ssh_cm, conn, {:eof, channel_id}})
           send(caller, {:ssh_cm, conn, {:closed, channel_id}})
 
+        String.contains?(command_str, "fail trailing ssh") ->
+          send(caller, {:ssh_cm, conn, {:exit_status, channel_id, 7}})
+          send(caller, {:ssh_cm, conn, {:data, channel_id, 1, "small\n"}})
+          send(caller, {:ssh_cm, conn, {:eof, channel_id}})
+          send(caller, {:ssh_cm, conn, {:closed, channel_id}})
+
+        String.contains?(command_str, "fail limit ssh") ->
+          send(caller, {:ssh_cm, conn, {:exit_status, channel_id, 7}})
+          send(caller, {:ssh_cm, conn, {:data, channel_id, 1, "123456"}})
+          send(caller, {:ssh_cm, conn, {:eof, channel_id}})
+          send(caller, {:ssh_cm, conn, {:closed, channel_id}})
+
         String.contains?(command_str, "limit ssh") ->
           send(caller, {:ssh_cm, conn, {:data, channel_id, 0, "123456"}})
           send(caller, {:ssh_cm, conn, {:exit_status, channel_id, 0}})
@@ -147,13 +159,30 @@ defmodule Jido.Shell.Backend.SSHTest do
     assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:command, :exit_code}}}}
   end
 
+  test "enforces output limit when non-zero exit arrives before trailing oversized data" do
+    {:ok, state} = init_fake()
+
+    {:ok, _worker_pid, _state} = SSH.execute(state, "fail limit ssh", [], output_limit: 3)
+
+    assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:command, :output_limit_exceeded}}}}
+  end
+
+  test "preserves non-zero exit when trailing data remains under the output limit" do
+    {:ok, state} = init_fake()
+
+    {:ok, _worker_pid, _state} = SSH.execute(state, "fail trailing ssh", [], output_limit: 100)
+
+    assert_receive {:command_event, {:output, "small\n"}}
+    assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:command, :exit_code}} = error}}
+    assert error.context.code == 7
+  end
+
   test "execute enforces output limits" do
     {:ok, state} = init_fake()
 
     {:ok, _worker_pid, _state} = SSH.execute(state, "limit ssh", [], output_limit: 3)
 
-    assert_receive {:command_finished,
-                    {:error, %Jido.Shell.Error{code: {:command, :output_limit_exceeded}}}}
+    assert_receive {:command_finished, {:error, %Jido.Shell.Error{code: {:command, :output_limit_exceeded}}}}
   end
 
   test "cancel closes channel and stops worker" do
@@ -289,21 +318,32 @@ defmodule Jido.Shell.Backend.SSHTest do
 
       # Start an Alpine container with SSHD and password auth
       {_, 0} =
-        System.cmd("docker", [
-          "run", "-d",
-          "--name", @container_name,
-          "-p", "#{@ssh_port}:22",
-          "alpine:latest",
-          "sh", "-c",
-          Enum.join([
-            "apk add --no-cache openssh",
-            "echo 'root:#{@ssh_password}' | chpasswd",
-            "ssh-keygen -A",
-            "sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config",
-            "sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config",
-            "/usr/sbin/sshd -D -e"
-          ], " && ")
-        ], stderr_to_stdout: true)
+        System.cmd(
+          "docker",
+          [
+            "run",
+            "-d",
+            "--name",
+            @container_name,
+            "-p",
+            "#{@ssh_port}:22",
+            "alpine:latest",
+            "sh",
+            "-c",
+            Enum.join(
+              [
+                "apk add --no-cache openssh",
+                "echo 'root:#{@ssh_password}' | chpasswd",
+                "ssh-keygen -A",
+                "sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config",
+                "sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config",
+                "/usr/sbin/sshd -D -e"
+              ],
+              " && "
+            )
+          ],
+          stderr_to_stdout: true
+        )
     end
 
     defp cleanup_container do
@@ -321,12 +361,17 @@ defmodule Jido.Shell.Backend.SSHTest do
       end
 
       # Try an actual SSH connection, not just TCP — SSHD needs time after port opens
-      case :ssh.connect(String.to_charlist(host), port, [
-             {:user, ~c"root"},
-             {:password, ~c"testpass"},
-             {:silently_accept_hosts, true},
-             {:user_interaction, false}
-           ], 3_000) do
+      case :ssh.connect(
+             String.to_charlist(host),
+             port,
+             [
+               {:user, ~c"root"},
+               {:password, ~c"testpass"},
+               {:silently_accept_hosts, true},
+               {:user_interaction, false}
+             ],
+             3_000
+           ) do
         {:ok, conn} ->
           :ssh.close(conn)
 

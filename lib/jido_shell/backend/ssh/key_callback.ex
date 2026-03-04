@@ -17,24 +17,43 @@ defmodule Jido.Shell.Backend.SSH.KeyCallback do
   @impl true
   def user_key(algorithm, opts) do
     # OTP 23+ passes key_cb tuple options under :key_cb_private
-    key_pem = get_key_from_opts(opts)
+    case get_key_from_opts(opts) do
+      key_pem when is_binary(key_pem) ->
+        entries = :public_key.pem_decode(key_pem)
 
-    case :public_key.pem_decode(key_pem) do
-      [] ->
-        {:error, :no_keys_found}
+        case entries do
+          [] ->
+            maybe_decode_openssh_key(key_pem, algorithm, :no_keys_found)
 
-      [{{:no_asn1, :new_openssh}, _der, :not_encrypted} | _] ->
-        # OpenSSH-format key (e.g. Ed25519) — use :ssh_file to decode
-        decode_openssh_key(key_pem, algorithm)
+          _ ->
+            case find_key_for_algorithm(entries, algorithm) do
+              {:ok, _} = ok ->
+                ok
 
-      entries ->
-        find_key_for_algorithm(entries, algorithm)
+              {:error, reason} when reason in [:no_matching_key, :key_decode_failed] ->
+                # Some key formats may decode as PEM but still require OpenSSH decoding.
+                maybe_decode_openssh_key(key_pem, algorithm, reason)
+
+              {:error, _} = error ->
+                error
+            end
+        end
+
+      _ ->
+        {:error, :no_key_provided}
+    end
+  end
+
+  defp maybe_decode_openssh_key(key_pem, algorithm, default_error) do
+    case decode_openssh_key(key_pem, algorithm) do
+      {:ok, _} = ok -> ok
+      _ -> {:error, default_error}
     end
   end
 
   defp decode_openssh_key(key_pem, algorithm) do
     case :ssh_file.decode(key_pem, :openssh_key_v1) do
-      [{key, _attrs} | _] when is_tuple(key) ->
+      [{key, _attrs} | _] ->
         if key_matches_algorithm?(key, algorithm) do
           {:ok, key}
         else
@@ -66,9 +85,11 @@ defmodule Jido.Shell.Backend.SSH.KeyCallback do
     _ -> {:error, :key_decode_failed}
   end
 
-  defp key_matches_algorithm?(key, algorithm) do
+  defp key_matches_algorithm?(key, algorithm) when is_tuple(key) do
     case {elem(key, 0), algorithm} do
       {:RSAPrivateKey, :"ssh-rsa"} -> true
+      {:RSAPrivateKey, :"rsa-sha2-256"} -> true
+      {:RSAPrivateKey, :"rsa-sha2-512"} -> true
       {:ECPrivateKey, :"ecdsa-sha2-nistp256"} -> true
       {:ECPrivateKey, :"ecdsa-sha2-nistp384"} -> true
       {:ECPrivateKey, :"ecdsa-sha2-nistp521"} -> true
@@ -76,9 +97,13 @@ defmodule Jido.Shell.Backend.SSH.KeyCallback do
       {:ECPrivateKey, :"ssh-ed25519"} -> ed25519_curve?(key)
       {:ECPrivateKey, :"ssh-ed448"} -> ed448_curve?(key)
       # OTP may also use these representations
-      _ when algorithm in [:"ssh-ed25519", :"ssh-ed448"] -> is_ed_key?(key)
+      _ when algorithm in [:"ssh-ed25519", :"ssh-ed448"] -> is_ed_key_tuple?(key)
       _ -> false
     end
+  end
+
+  defp key_matches_algorithm?(key, algorithm) when is_map(key) do
+    algorithm in [:"ssh-ed25519", :"ssh-ed448"]
   end
 
   defp ed25519_curve?({:ECPrivateKey, _, _, {:namedCurve, {1, 3, 101, 112}}, _, _}), do: true
@@ -89,9 +114,8 @@ defmodule Jido.Shell.Backend.SSH.KeyCallback do
   defp ed448_curve?({:ECPrivateKey, _, _, {:namedCurve, {1, 3, 101, 113}}, _}), do: true
   defp ed448_curve?(_), do: false
 
-  defp is_ed_key?(key) when is_map(key), do: true
-  defp is_ed_key?({:ed_pri, _, _, _}), do: true
-  defp is_ed_key?(_), do: false
+  defp is_ed_key_tuple?({:ed_pri, _, _, _}), do: true
+  defp is_ed_key_tuple?(_), do: false
 
   defp get_key_from_opts(opts) do
     case opts[:key_cb_private] do
