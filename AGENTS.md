@@ -12,6 +12,7 @@ mix compile --warnings-as-errors
 mix test
 mix test --include flaky
 mix coveralls
+mix jido_shell.guardrails
 mix quality
 mix docs
 mix jido_shell

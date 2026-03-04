@@ -379,6 +379,7 @@ defmodule Jido.Shell.E2ETest do
       {:ok, _} = TestShell.await_event(shell, :command_started)
       TestShell.cancel(shell)
       {:ok, _} = TestShell.await_event(shell, :command_cancelled)
+      _ = TestShell.collect_events(shell, 200)
 
       # Should be able to run new command
       assert {:ok, "recovered"} = TestShell.run(shell, "echo recovered")

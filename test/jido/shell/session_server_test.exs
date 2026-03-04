@@ -143,10 +143,8 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
       assert_receive {:jido_shell_session, ^session_id, {:command_started, "unknown_cmd"}}, @event_timeout
 
-      assert_receive(
-        {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}},
-        @event_timeout
-      )
+      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:shell, :unknown_command}}}},
+                     @event_timeout
     end
 
     test "broadcasts busy error when command already running" do
@@ -275,7 +273,7 @@ defmodule Jido.Shell.ShellSessionServerTest do
           end
         end)
 
-      assert_receive :registered
+      assert_receive :registered, @event_timeout
       assert Process.alive?(pid)
 
       assert {:error, %Jido.Shell.Error{code: {:session, :not_found}}} =

@@ -8,9 +8,17 @@ defmodule Mix.Tasks.JidoShell.Guardrails do
   @shortdoc "Validate Jido.Shell namespace/layout guardrails"
 
   @impl Mix.Task
-  def run(_args) do
-    case Jido.Shell.Guardrails.check(File.cwd!()) do
+  def run(args) do
+    {opts, _argv, _invalid} =
+      OptionParser.parse(args,
+        strict: [root: :string]
+      )
+
+    root = Keyword.get(opts, :root, File.cwd!())
+
+    case Jido.Shell.Guardrails.check(root) do
       :ok ->
+        Mix.shell().info("jido_shell guardrails: ok")
         :ok
 
       {:error, violations} ->

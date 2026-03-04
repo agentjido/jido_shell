@@ -108,7 +108,7 @@ defmodule Jido.Shell.MixProject do
   defp package do
     [
       files:
-        ~w(lib mix.exs LICENSE README.md MIGRATION.md CHANGELOG.md CONTRIBUTING.md AGENTS.md usage-rules.md .formatter.exs),
+        ~w(lib mix.exs LICENSE README.md MIGRATION.md CHANGELOG.md CONTRIBUTING.md GUARDRAILS.md AGENTS.md usage-rules.md .formatter.exs),
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -130,6 +130,7 @@ defmodule Jido.Shell.MixProject do
         "MIGRATION.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
+        "GUARDRAILS.md",
         "LICENSE"
       ],
       groups_for_modules: [
