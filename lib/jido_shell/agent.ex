@@ -167,6 +167,9 @@ defmodule Jido.Shell.Agent do
       {:jido_shell_session, ^session_id, {:output, chunk}} ->
         collect_output(session_id, expected_command, [chunk | acc], timeout, started?)
 
+      {:jido_shell_session, ^session_id, {:output_stderr, chunk}} ->
+        collect_output(session_id, expected_command, [chunk | acc], timeout, started?)
+
       {:jido_shell_session, ^session_id, {:cwd_changed, _}} ->
         collect_output(session_id, expected_command, acc, timeout, started?)
 

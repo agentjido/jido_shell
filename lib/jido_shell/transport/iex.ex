@@ -120,6 +120,10 @@ defmodule Jido.Shell.Transport.IEx do
         IO.write(chunk)
         wait_for_completion(session_id, cwd, timeout_ms)
 
+      {:jido_shell_session, ^session_id, {:output_stderr, chunk}} ->
+        IO.write(:stderr, chunk)
+        wait_for_completion(session_id, cwd, timeout_ms)
+
       {:jido_shell_session, ^session_id, {:error, error}} ->
         print_error(error)
         cwd

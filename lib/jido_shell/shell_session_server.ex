@@ -30,6 +30,7 @@ defmodule Jido.Shell.ShellSessionServer do
 
   The transport will receive messages like:
   - `{:jido_shell_session, session_id, {:output, chunk}}`
+  - `{:jido_shell_session, session_id, {:output_stderr, chunk}}`
   - `{:jido_shell_session, session_id, :command_done}`
   """
   @spec subscribe(String.t(), pid(), keyword()) ::
@@ -89,6 +90,13 @@ defmodule Jido.Shell.ShellSessionServer do
 
   @impl true
   def init(opts) do
+    # Trap exits so backends' `terminate/1` callbacks run on supervisor
+    # shutdown, not just on manual `GenServer.stop/1`. Without this, shutdowns
+    # initiated via `DynamicSupervisor.terminate_child/2` would skip cleanup
+    # for backends that spawn external resources (SSH connections, Bash
+    # sessions, Sprite handles, …).
+    Process.flag(:trap_exit, true)
+
     session_id = Keyword.fetch!(opts, :session_id)
     workspace_id = Keyword.fetch!(opts, :workspace_id)
     cwd = Keyword.get(opts, :cwd, "/")
@@ -237,6 +245,14 @@ defmodule Jido.Shell.ShellSessionServer do
       true ->
         {:noreply, state}
     end
+  end
+
+  @impl true
+  def handle_info({:EXIT, _pid, _reason}, state) do
+    # With `trap_exit` enabled, stray exits from linked helper processes land
+    # here. Backends own their own cleanup via `terminate/1`, so just ignore
+    # these messages and let the supervisor-initiated shutdown path run.
+    {:noreply, state}
   end
 
   # === Private ===
