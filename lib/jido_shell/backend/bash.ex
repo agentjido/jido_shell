@@ -179,9 +179,23 @@ defmodule Jido.Shell.Backend.Bash do
     end
   end
 
+  # Sandbox-safe defaults that prevent the `:bash` library from seeding
+  # session variables with values read from the host OS at init time
+  # (`System.get_env("HOME")`, `System.get_env("PATH")`, etc.).
+  @sandbox_env_defaults %{
+    "HOME" => "/",
+    "PATH" => "",
+    "MACHTYPE" => "beam-unknown-elixir"
+  }
+
   defp start_bash_session(config, workspace_id) do
-    env = Map.get(config, :env, %{}) |> Map.put("JIDO_WORKSPACE_ID", workspace_id)
+    user_env = Map.get(config, :env, %{})
     cwd = Map.get(config, :cwd, "/")
+
+    env =
+      @sandbox_env_defaults
+      |> Map.merge(user_env)
+      |> Map.put("JIDO_WORKSPACE_ID", workspace_id)
 
     opts = [
       filesystem: {VfsAdapter, %{workspace_id: workspace_id}},

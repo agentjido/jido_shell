@@ -132,6 +132,49 @@ defmodule Jido.Shell.Backend.BashTest do
 
       assert result in [:error, :done, :output]
     end
+
+    test "HOME is sandbox-safe, not the host value", %{workspace_id: wid} do
+      session_id = start_session(wid)
+
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, ~s/echo "$HOME"/)
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+      assert {:ok, output, _} = receive_output(session_id)
+      assert String.trim(output) == "/"
+      refute output =~ System.get_env("HOME", "")
+    end
+
+    test "PATH is empty so external resolution cannot succeed", %{workspace_id: wid} do
+      session_id = start_session(wid)
+
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, ~s/echo "$PATH"/)
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+      assert {:ok, output, _} = receive_output(session_id)
+      assert String.trim(output) == ""
+    end
+
+    test "MACHTYPE does not leak host architecture", %{workspace_id: wid} do
+      session_id = start_session(wid)
+
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, ~s/echo "$MACHTYPE"/)
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+      assert {:ok, output, _} = receive_output(session_id)
+      assert String.trim(output) == "beam-unknown-elixir"
+    end
+
+    test "user-provided env overrides sandbox defaults", %{workspace_id: wid} do
+      {:ok, session_id} =
+        Jido.Shell.ShellSession.start(wid,
+          backend: {Jido.Shell.Backend.Bash, %{}},
+          env: %{"HOME" => "/custom_home"}
+        )
+
+      {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
+
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, ~s/echo "$HOME"/)
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+      assert {:ok, output, _} = receive_output(session_id)
+      assert String.trim(output) == "/custom_home"
+    end
   end
 
   describe "cwd sync" do
