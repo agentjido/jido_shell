@@ -87,6 +87,56 @@ Canonical session modules are:
 ## Execution Backends
 
 Sessions run with `Jido.Shell.Backend.Local` by default.
+
+### Bash Backend
+
+The Bash backend hands entire command lines to a persistent `Bash.Session` process, so loops, conditionals, variables, pipes, and arithmetic expansion all work as in real Bash. State persists across calls within the same session.
+
+**Dependency** — add the optional `:bash` package to your `mix.exs`:
+
+```elixir
+{:bash, "~> 0.5", optional: true}
+```
+
+**Starting a session:**
+
+```elixir
+{:ok, session_id} =
+  Jido.Shell.ShellSession.start_with_vfs("my_workspace",
+    backend: {Jido.Shell.Backend.Bash, %{}}
+  )
+```
+
+**Agent API:**
+
+```elixir
+{:ok, session} = Jido.Shell.Agent.new("my_workspace",
+  backend: {Jido.Shell.Backend.Bash, %{}})
+
+{:ok, output} = Jido.Shell.Agent.run(session, """
+  for i in 1 2 3; do echo "item $i"; done
+""")
+```
+
+**IEx transport:**
+
+```elixir
+Jido.Shell.Transport.IEx.start("my_workspace",
+  backend: {Jido.Shell.Backend.Bash, %{}})
+```
+
+All registered Jido commands (`echo`, `ls`, `cat`, `cd`, `write`, etc.) are bridged into bash via function shims, so scripts can call them by name. Filesystem I/O routes through `Jido.Shell.VFS` — no host files are touched.
+
+**Isolation:** External binaries (`grep`, `sed`, `curl`, etc.) are blocked by command policy. The session environment is sanitised — `HOME`, `PATH`, and `MACHTYPE` are overridden with sandbox-safe values. See `Jido.Shell.Backend.Bash` moduledoc for the full isolation model.
+
+**Known limitations:**
+
+- Only bash builtins and bridged Jido commands are available — no host binaries.
+- Glob support covers simple `*`/`?` patterns only.
+- Cancellation is best-effort: killing the wrapper task stops output, but the in-flight bash execution may complete inside the session.
+
+### Sprite Backend
+
 To execute commands on Fly.io Sprites, pass a backend tuple when starting a session:
 
 ```elixir
@@ -183,6 +233,7 @@ Event payloads:
 
 - `{:command_started, line}`
 - `{:output, chunk}`
+- `{:output_stderr, chunk}` (Bash backend only)
 - `{:error, %Jido.Shell.Error{}}`
 - `{:cwd_changed, path}`
 - `:command_done`
