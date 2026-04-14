@@ -18,6 +18,34 @@ defmodule Jido.Shell.Backend.Bash do
   scripts cannot spawn any host process — every effective command is either a
   bash builtin or a Jido interop call.
 
+  ## Isolation model
+
+  Four layers enforce sandbox boundaries:
+
+    1. **Command policy** — `command_policy: [commands: :no_external]` prevents
+       any OS process from being spawned. Only bash builtins, user-defined shell
+       functions, and Jido interop calls may execute.
+
+    2. **Virtual filesystem** — all file I/O (redirections, `source`, PATH
+       resolution, glob expansion, test operators) routes through
+       `Jido.Shell.Backend.Bash.VfsAdapter`, which delegates to
+       `Jido.Shell.VFS`. No `File.*` or `:file.*` calls reach the host.
+
+    3. **Sanitised environment** — `HOME`, `PATH`, and `MACHTYPE` are overridden
+       with sandbox-safe values so the `:bash` library's init does not leak
+       host-system information into session variables. User-supplied env values
+       from `config.env` take precedence via merge ordering.
+
+    4. **Interop trust boundary** — `defbash` handlers in
+       `Jido.Shell.Backend.Bash.JidoInterop` execute as **unrestricted Elixir
+       code** inside the same BEAM process as the session. The `:bash` library
+       provides no sandbox around interop function bodies. Any module loaded via
+       the `apis:` option has full access to `System.*`, `File.*`, `Port.*`,
+       `spawn`, and the rest of the BEAM. **Only load interop modules you have
+       audited.** The built-in `JidoInterop` is safe — it delegates every call
+       to `Jido.Shell.CommandRunner`, which routes through VFS and the command
+       registry.
+
   ## Known limitations
 
     * External binaries (`grep`, `sed`, `awk`, `find`, `curl`, …) are blocked by

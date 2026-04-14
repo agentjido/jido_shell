@@ -18,6 +18,20 @@ defmodule Jido.Shell.Backend.Bash.JidoInterop do
   Workspace id is taken from the bash session state under the
   `:jido_workspace_id` variable, which `Jido.Shell.Backend.Bash` sets during
   initialisation.
+
+  ## Security — interop trust boundary
+
+  `defbash` handlers execute as **unrestricted Elixir code** in the same BEAM
+  process as the `Bash.Session` GenServer. The `:bash` library does not sandbox
+  interop function bodies — a handler may call `File.*`, `System.cmd`,
+  `System.get_env`, `spawn`, or any other BEAM API.
+
+  This module is safe because every handler delegates to
+  `Jido.Shell.CommandRunner.execute/3`, which routes through the VFS and the
+  command registry. If you add a new interop module or modify a handler, ensure
+  it does **not** perform direct host I/O or spawn OS processes — doing so would
+  bypass the filesystem virtualisation and command policy that the rest of the
+  backend enforces.
   """
 
   use Bash.Interop, namespace: "jido"
