@@ -238,15 +238,12 @@ defmodule Jido.Shell.Backend.Bash.JidoInteropTest do
       assert {:ok, "test\n"} = result
     end
 
-    test "variable_value returns empty for non-standard types", %{workspace_id: _wid} do
+    test "invalid workspace variables return a normal interop error", %{workspace_id: _wid} do
       # A non-struct, non-binary workspace id falls to the empty-string path.
       state = %{variables: %{"JIDO_WORKSPACE_ID" => {:tuple, "x"}}, working_dir: "/"}
-      # The empty workspace_id causes State.new to fail validation, which
-      # surfaces through `with` as a non-matching clause → unhandled raise.
-      # This exercises the variable_value/1 wildcard clause.
-      assert_raise WithClauseError, fn ->
-        JidoInterop.dispatch("echo", ["hi"], state)
-      end
+
+      assert {:error, message} = JidoInterop.dispatch("echo", ["hi"], state)
+      assert message =~ "invalid session state"
     end
   end
 

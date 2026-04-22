@@ -295,6 +295,57 @@ defmodule Jido.Shell.Backend.BashTest do
       assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:command, :exit_code}}}},
                      @event_timeout
     end
+
+    test "exit builtin preserves non-zero status", %{workspace_id: wid} do
+      session_id = start_session(wid)
+
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "exit 42")
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+
+      assert_receive {:jido_shell_session, ^session_id,
+                      {:error,
+                       %Jido.Shell.Error{
+                         code: {:command, :exit_code},
+                         context: %{exit_code: 42}
+                       }}},
+                     @event_timeout
+    end
+  end
+
+  describe "execution limits" do
+    test "enforces output limit for native bash output", %{workspace_id: wid} do
+      session_id = start_session(wid)
+
+      {:ok, :accepted} =
+        ShellSessionServer.run_command(session_id, "echo abcdef", execution_context: %{limits: %{max_output_bytes: 3}})
+
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+
+      assert_receive {:jido_shell_session, ^session_id,
+                      {:error, %Jido.Shell.Error{code: {:command, :output_limit_exceeded}}}},
+                     @event_timeout
+
+      refute_receive {:jido_shell_session, ^session_id, {:output, _}}, 100
+    end
+
+    test "enforces runtime limit and keeps session reusable", %{workspace_id: wid} do
+      session_id = start_session(wid)
+
+      {:ok, :accepted} =
+        ShellSessionServer.run_command(session_id, "while true; do :; done",
+          execution_context: %{limits: %{max_runtime_ms: 50}}
+        )
+
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+
+      assert_receive {:jido_shell_session, ^session_id,
+                      {:error, %Jido.Shell.Error{code: {:command, :runtime_limit_exceeded}}}},
+                     @event_timeout
+
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo alive")
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+      assert {:ok, "alive\n", ""} = receive_output(session_id)
+    end
   end
 
   describe "execute streaming" do
@@ -348,6 +399,19 @@ defmodule Jido.Shell.Backend.BashTest do
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo ok")
       assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
       assert {:ok, "ok\n", ""} = receive_output(session_id)
+    end
+
+    test "mutating interop workspace state returns a command error", %{workspace_id: wid} do
+      session_id = start_session(wid)
+
+      {:ok, :accepted} = ShellSessionServer.run_command(session_id, "JIDO_WORKSPACE_ID=; echo hi")
+      assert_receive {:jido_shell_session, ^session_id, {:command_started, _}}, @event_timeout
+
+      assert_receive {:jido_shell_session, ^session_id, {:output_stderr, stderr}}, @event_timeout
+      assert stderr =~ "invalid session state"
+
+      assert_receive {:jido_shell_session, ^session_id, {:error, %Jido.Shell.Error{code: {:command, :exit_code}}}},
+                     @event_timeout
     end
   end
 

@@ -63,6 +63,9 @@ defmodule Jido.Shell.Backend.Bash.JidoInterop do
     else
       {:error, :missing_workspace} ->
         {:error, "jido.#{command}: workspace not configured\n"}
+
+      {:error, reason} ->
+        {:error, "jido.#{command}: invalid session state: #{inspect(reason)}\n"}
     end
   end
 

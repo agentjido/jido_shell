@@ -69,6 +69,7 @@ defmodule Jido.Shell.Backend.Bash do
 
   alias Jido.Shell.Backend.Bash.JidoInterop
   alias Jido.Shell.Backend.Bash.VfsAdapter
+  alias Jido.Shell.Backend.OutputLimiter
   alias Jido.Shell.Error
 
   @default_task_supervisor Jido.Shell.CommandTaskSupervisor
@@ -97,38 +98,21 @@ defmodule Jido.Shell.Backend.Bash do
     line = command_line(command, args)
     session_pid = state.session_pid
     bash_session = state.bash_session
+    task_supervisor = state.task_supervisor
     previous_cwd = state.cwd
-
-    emit = fn event -> send(session_pid, {:command_event, event}) end
+    timeout = positive_limit(Keyword.get(exec_opts, :timeout))
+    output_limit = positive_limit(Keyword.get(exec_opts, :output_limit))
 
     task_fun = fn ->
+      {emit, limit_ref} = limited_emit(session_pid, bash_session, output_limit)
+
       result =
         case safe_parse(line) do
           {:error, parse_error} ->
             {:error, Error.command(:syntax_error, %{line: line, reason: inspect(parse_error)})}
 
           {:ok, ast} ->
-            raw =
-              case Bash.Session.execute(bash_session, ast, on_output: &stream_output(emit, &1)) do
-                {:ok, execution} ->
-                  case exit_code(execution) do
-                    0 -> {:ok, nil}
-                    code -> {:error, Error.command(:exit_code, %{exit_code: code, line: line})}
-                  end
-
-                {:error, execution} ->
-                  {:error,
-                   Error.command(:exit_code, %{
-                     exit_code: exit_code(execution) || 1,
-                     line: line
-                   })}
-
-                {:exit, _execution} ->
-                  {:ok, nil}
-
-                {:exec, _execution} ->
-                  {:ok, nil}
-              end
+            raw = execute_bash(task_supervisor, bash_session, ast, line, emit, limit_ref, timeout)
 
             maybe_augment_with_cwd(raw, bash_session, previous_cwd)
         end
@@ -281,6 +265,122 @@ defmodule Jido.Shell.Backend.Bash do
     end
   end
 
+  defp execute_bash(task_supervisor, bash_session, ast, line, emit, limit_ref, timeout) do
+    task =
+      Task.Supervisor.async_nolink(task_supervisor, fn ->
+        Bash.Session.execute(bash_session, ast, on_output: &stream_output(emit, &1))
+      end)
+
+    await_bash(task, bash_session, line, limit_ref, timeout)
+  end
+
+  defp await_bash(task, bash_session, line, limit_ref, timeout) do
+    task_ref = task.ref
+
+    receive do
+      {^limit_ref, {:error, %Error{} = error}} ->
+        _ = safe_cancel_execution(bash_session)
+        _ = shutdown_task(task)
+        {:error, error}
+
+      {^task_ref, result} ->
+        case pending_limit_error(limit_ref) do
+          {:error, %Error{} = error} -> {:error, error}
+          :none -> bash_result(result, line)
+        end
+
+      {:DOWN, ^task_ref, :process, _pid, reason} ->
+        {:error, Error.command(:crashed, %{line: line, reason: reason})}
+    after
+      receive_timeout(timeout) ->
+        _ = safe_cancel_execution(bash_session)
+        _ = shutdown_task(task)
+        {:error, Error.command(:runtime_limit_exceeded, %{line: line, max_runtime_ms: timeout})}
+    end
+  end
+
+  defp bash_result({status, execution}, line) when status in [:ok, :error, :exit, :exec] do
+    case exit_code(execution) do
+      0 ->
+        {:ok, nil}
+
+      nil when status == :error ->
+        {:error, Error.command(:exit_code, %{exit_code: 1, line: line})}
+
+      nil ->
+        {:ok, nil}
+
+      code ->
+        {:error, Error.command(:exit_code, %{exit_code: code, line: line})}
+    end
+  end
+
+  defp bash_result(other, line), do: {:error, Error.command(:exit_code, %{exit_code: 1, line: line, result: other})}
+
+  defp limited_emit(session_pid, bash_session, output_limit) do
+    owner = self()
+    limit_ref = make_ref()
+    counter = :counters.new(1, [])
+
+    emit = fn event ->
+      case check_output_limit(event, counter, output_limit) do
+        :ok ->
+          send(session_pid, {:command_event, event})
+
+        {:error, %Error{} = error} ->
+          send(owner, {limit_ref, {:error, error}})
+          _ = safe_cancel_execution(bash_session)
+          :ok
+      end
+    end
+
+    {emit, limit_ref}
+  end
+
+  defp check_output_limit(_event, _counter, nil), do: :ok
+
+  defp check_output_limit(event, counter, output_limit) do
+    case output_size(event) do
+      nil ->
+        :ok
+
+      chunk_bytes ->
+        emitted_bytes = :counters.get(counter, 1)
+
+        case OutputLimiter.check(chunk_bytes, emitted_bytes, output_limit) do
+          {:ok, updated_total} ->
+            :counters.put(counter, 1, updated_total)
+            :ok
+
+          {:limit_exceeded, %Error{} = error} ->
+            {:error, error}
+        end
+    end
+  end
+
+  defp output_size({:output, chunk}), do: chunk |> IO.iodata_to_binary() |> byte_size()
+  defp output_size({:output_stderr, chunk}), do: chunk |> IO.iodata_to_binary() |> byte_size()
+  defp output_size(_event), do: nil
+
+  defp pending_limit_error(limit_ref) do
+    receive do
+      {^limit_ref, {:error, %Error{} = error}} -> {:error, error}
+    after
+      0 -> :none
+    end
+  end
+
+  defp shutdown_task(task) do
+    Task.shutdown(task, 100) || Task.shutdown(task, :brutal_kill)
+  end
+
+  defp receive_timeout(nil), do: :infinity
+  defp receive_timeout(timeout) when is_integer(timeout) and timeout > 0, do: timeout
+  defp receive_timeout(_timeout), do: :infinity
+
+  defp positive_limit(value) when is_integer(value) and value > 0, do: value
+  defp positive_limit(_value), do: nil
+
   defp stream_output(emit, {:stdout, data}), do: emit.({:output, data})
   defp stream_output(emit, {:stderr, data}), do: emit.({:output_stderr, data})
   defp stream_output(_emit, _), do: :ok
@@ -325,6 +425,17 @@ defmodule Jido.Shell.Backend.Bash do
   catch
     _, _ -> {:error, :call_failed}
   end
+
+  defp safe_cancel_execution(pid) when is_pid(pid) do
+    if Process.alive?(pid), do: Bash.Session.cancel_execution(pid)
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
+
+  defp safe_cancel_execution(_pid), do: :ok
 
   defp safe_stop(pid) do
     Bash.Session.stop(pid)
