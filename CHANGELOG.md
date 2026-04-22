@@ -7,20 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- `Jido.Shell.Backend.Bash` — new execution backend powered by the `:bash` library
-  ([tv-labs/bash](https://github.com/tv-labs/bash)). Provides a persistent `Bash.Session`
-  per jido session with real Bash syntax support (loops, conditionals, variables, pipes,
-  arithmetic expansion). Requires the optional `:bash` dependency.
-- `Jido.Shell.Backend.Bash.JidoInterop` — `Bash.Interop` bridge that exposes registered
-  Jido commands to bash scripts via `defbash` handlers and function shims.
-- `Jido.Shell.Backend.Bash.VfsAdapter` — `Bash.Filesystem` adapter routing all file I/O
-  through `Jido.Shell.VFS` so bash scripts never touch the host filesystem.
-- `{:output_stderr, chunk}` session event for stderr streaming (emitted by Bash backend,
-  handled by Agent, StreamJson, and IEx transport).
-- Sandbox-safe environment defaults (`HOME=/`, `PATH=""`, `MACHTYPE=beam-unknown-elixir`)
-  to prevent the `:bash` library from leaking host-system values into session variables.
-
 ### Changed
 - Renamed session namespace to explicit shell session modules:
   - `Jido.Shell.ShellSession`,
