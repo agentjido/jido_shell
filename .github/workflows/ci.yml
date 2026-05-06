@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - main
@@ -10,42 +11,22 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
-  guardrails:
-    name: Guardrails
-    uses: agentjido/github-actions/.github/workflows/elixir-test.yml@v3
-    with:
-      otp_versions: '["27"]'
-      elixir_versions: '["1.18"]'
-      test_command: mix jido_shell.guardrails
-
-  lint:
-    name: Lint
-    uses: agentjido/github-actions/.github/workflows/elixir-lint.yml@v3
-    with:
-      otp_version: "28"
-      elixir_version: "1.19"
-      lint_command: >-
-        mix format --check-formatted &&
-        mix compile --warnings-as-errors &&
-        mix credo --min-priority higher &&
-        mix dialyzer
-      validate_hex_package: false
-
-  test:
-    name: Test
-    uses: agentjido/github-actions/.github/workflows/elixir-test.yml@v3
+  ci:
+    name: CI
+    uses: agentjido/github-actions/.github/workflows/jido-ci.yml@v4
+    secrets: inherit
     with:
       otp_versions: '["27", "28"]'
       elixir_versions: '["1.18", "1.19"]'
+      experimental_compile_elixir_versions: '["v1.20.0-rc.4"]'
+      experimental_compile_otp_versions: '["28.4.1"]'
+      experimental_compile_otp_name: '28'
+      credo_command: mix credo --min-priority higher
+      validate_hex_package: false
+      docs_command: mix docs -f html
       test_command: mix test
-
-  coverage:
-    name: Coverage
-    uses: agentjido/github-actions/.github/workflows/elixir-test.yml@v3
-    with:
-      otp_versions: '["27"]'
-      elixir_versions: '["1.18"]'
-      test_command: >-
-        mix coveralls.json &&
-        MIX_ENV=test mix run -e 'minimum = 83.5; data = Jason.decode!(File.read!("cover/excoveralls.json")); coverages = data["source_files"] |> Enum.flat_map(& &1["coverage"]); relevant = Enum.count(coverages, &(!is_nil(&1))); missed = Enum.count(coverages, &(&1 == 0)); percent = (relevant - missed) * 100.0 / relevant; rounded = Float.round(percent, 2); IO.puts("Coverage gate: #{rounded}% (minimum #{minimum}%)"); if percent < minimum, do: System.halt(1)'
