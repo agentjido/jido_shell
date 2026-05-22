@@ -73,6 +73,8 @@ defmodule Jido.Shell.Backend.Bash do
   alias Jido.Shell.Error
 
   @default_task_supervisor Jido.Shell.CommandTaskSupervisor
+  @cancel_grace_ms 1_000
+  @cancel_wait_ms 2_000
 
   @impl true
   def init(config) when is_map(config) do
@@ -129,13 +131,11 @@ defmodule Jido.Shell.Backend.Bash do
 
   @impl true
   def cancel(state, command_ref) when is_pid(command_ref) do
-    # Interrupt the in-flight Bash.Session.execute/3 call so it returns with
-    # exit_code 130 (SIGINT convention). The session remains usable.
-    if is_pid(state.bash_session) and Process.alive?(state.bash_session) do
-      Bash.Session.cancel_execution(state.bash_session)
-    end
+    # Interrupt the foreground bash execution cooperatively so traps can run.
+    _ = safe_signal_execution(state.bash_session)
+    _ = await_process_exit(command_ref, @cancel_wait_ms)
 
-    # Kill the Task wrapper (may already be finishing after cancel_execution).
+    # Kill the Task wrapper (may already be finishing after the signal).
     if Process.alive?(command_ref) do
       Process.exit(command_ref, :shutdown)
     end
@@ -279,8 +279,7 @@ defmodule Jido.Shell.Backend.Bash do
 
     receive do
       {^limit_ref, {:error, %Error{} = error}} ->
-        _ = safe_cancel_execution(bash_session)
-        _ = shutdown_task(task)
+        _ = signal_and_shutdown_task(task, bash_session)
         {:error, error}
 
       {^task_ref, result} ->
@@ -293,8 +292,7 @@ defmodule Jido.Shell.Backend.Bash do
         {:error, Error.command(:crashed, %{line: line, reason: reason})}
     after
       receive_timeout(timeout) ->
-        _ = safe_cancel_execution(bash_session)
-        _ = shutdown_task(task)
+        _ = signal_and_shutdown_task(task, bash_session)
         {:error, Error.command(:runtime_limit_exceeded, %{line: line, max_runtime_ms: timeout})}
     end
   end
@@ -329,7 +327,7 @@ defmodule Jido.Shell.Backend.Bash do
 
         {:error, %Error{} = error} ->
           send(owner, {limit_ref, {:error, error}})
-          _ = safe_cancel_execution(bash_session)
+          _ = safe_signal_execution(bash_session)
           :ok
       end
     end
@@ -370,8 +368,21 @@ defmodule Jido.Shell.Backend.Bash do
     end
   end
 
-  defp shutdown_task(task) do
-    Task.shutdown(task, 100) || Task.shutdown(task, :brutal_kill)
+  defp signal_and_shutdown_task(task, bash_session) do
+    _ = safe_signal_execution(bash_session)
+    Task.shutdown(task, @cancel_wait_ms) || Task.shutdown(task, :brutal_kill)
+  end
+
+  defp await_process_exit(pid, timeout) when is_pid(pid) do
+    ref = Process.monitor(pid)
+
+    receive do
+      {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+    after
+      timeout ->
+        Process.demonitor(ref, [:flush])
+        :timeout
+    end
   end
 
   defp receive_timeout(nil), do: :infinity
@@ -426,8 +437,8 @@ defmodule Jido.Shell.Backend.Bash do
     _, _ -> {:error, :call_failed}
   end
 
-  defp safe_cancel_execution(pid) when is_pid(pid) do
-    if Process.alive?(pid), do: Bash.Session.cancel_execution(pid)
+  defp safe_signal_execution(pid) when is_pid(pid) do
+    if Process.alive?(pid), do: Bash.Session.signal(pid, :sigint, grace: @cancel_grace_ms)
     :ok
   rescue
     _ -> :ok
@@ -435,7 +446,7 @@ defmodule Jido.Shell.Backend.Bash do
     _, _ -> :ok
   end
 
-  defp safe_cancel_execution(_pid), do: :ok
+  defp safe_signal_execution(_pid), do: :ok
 
   defp safe_stop(pid) do
     Bash.Session.stop(pid)

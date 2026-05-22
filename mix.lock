@@ -1,5 +1,5 @@
 %{
-  "bash": {:git, "https://github.com/lostbean/bash.git", "413f5336b2c4a9177c85d1f4c9cab4ddbb3c9994", [branch: "egomes/cancel-execution"]},
+  "bash": {:git, "https://github.com/tv-labs/bash.git", "c1038ff83e825c29ea131bf8b728bd1672734c01", [ref: "c1038ff83e825c29ea131bf8b728bd1672734c01"]},
   "bunt": {:hex, :bunt, "1.0.0", "081c2c665f086849e6d57900292b3a161727ab40431219529f13c4ddcf3e7a44", [:mix], [], "hexpm", "dc5f86aa08a5f6fa6b8096f0735c4e76d54ae5c9fa2c143e5a1fc7c1cd9bb6b5"},
   "certifi": {:hex, :certifi, "2.15.0", "0e6e882fcdaaa0a5a9f2b3db55b1394dba07e8d6d9bcad08318fb604c6839712", [:rebar3], [], "hexpm", "b147ed22ce71d72eafdad94f055165c1c182f61a2ff49df28bcc71d1d5b94a60"},
   "cowlib": {:hex, :cowlib, "2.16.0", "54592074ebbbb92ee4746c8a8846e5605052f29309d3a873468d76cdf932076f", [:make, :rebar3], [], "hexpm", "7f478d80d66b747344f0ea7708c187645cfcc08b11aa424632f78e25bf05db51"},

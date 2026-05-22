@@ -95,7 +95,10 @@ The Bash backend hands entire command lines to a persistent `Bash.Session` proce
 **Dependency** — add the optional `:bash` package to your `mix.exs`:
 
 ```elixir
-{:bash, "~> 0.5", optional: true}
+{:bash,
+ git: "https://github.com/tv-labs/bash.git",
+ ref: "c1038ff83e825c29ea131bf8b728bd1672734c01",
+ optional: true}
 ```
 
 **Starting a session:**
@@ -133,7 +136,7 @@ All registered Jido commands (`echo`, `ls`, `cat`, `cd`, `write`, etc.) are brid
 
 - Only bash builtins and bridged Jido commands are available — no host binaries.
 - Glob support covers simple `*`/`?` patterns only.
-- Cancellation is best-effort: killing the wrapper task stops output, but the in-flight bash execution may complete inside the session.
+- Cancellation uses `Bash.Session.signal/3` with `:sigint`; scripts can run `INT`/`EXIT` traps before stopping.
 
 ### Sprite Backend
 
