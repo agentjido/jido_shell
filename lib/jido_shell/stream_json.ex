@@ -185,6 +185,21 @@ defmodule Jido.Shell.StreamJson do
             if(parsed_any?, do: monotonic_ms(), else: last_event_ms)
           )
 
+        {:jido_shell_session, ^session_id, {:output_stderr, chunk}} ->
+          collect_stream_output(
+            session_id,
+            deadline_ms,
+            heartbeat_interval_ms,
+            on_event,
+            on_raw_line,
+            on_heartbeat,
+            line_buffer,
+            [chunk | output_acc],
+            event_acc,
+            started?,
+            last_event_ms
+          )
+
         {:jido_shell_session, ^session_id, {:cwd_changed, _}} ->
           collect_stream_output(
             session_id,
