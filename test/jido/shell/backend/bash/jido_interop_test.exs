@@ -99,6 +99,16 @@ defmodule Jido.Shell.Backend.Bash.JidoInteropTest do
       assert stdout =~ "hello world"
       assert stdout =~ "and again"
     end
+
+    test "preserves parser separators inside a single bash argument", %{session: session} do
+      {0, stdout, _} = run!(session, ~s/jido.echo 'foo;bar' 'one&&two'/)
+      assert stdout == "foo;bar one&&two\n"
+    end
+
+    test "preserves quote and backslash characters inside arguments", %{session: session} do
+      {0, stdout, _} = run!(session, ~s/jido.echo 'quote"here' 'path\\name'/)
+      assert stdout == ~s(quote"here path\\name\n)
+    end
   end
 
   describe "dispatch/3 direct" do
@@ -262,6 +272,12 @@ defmodule Jido.Shell.Backend.Bash.JidoInteropTest do
       {:ok, _, ^session} = Bash.run("my_echo() { jido.echo \"$@\"; }", session)
       {0, stdout, _} = run!(session, "my_echo routed")
       assert stdout == "routed\n"
+    end
+
+    test "function shim preserves shell separators inside arguments", %{session: session} do
+      {:ok, _, ^session} = Bash.run("my_echo() { jido.echo \"$@\"; }", session)
+      {0, stdout, _} = run!(session, "my_echo 'foo;bar' 'one&&two'")
+      assert stdout == "foo;bar one&&two\n"
     end
   end
 

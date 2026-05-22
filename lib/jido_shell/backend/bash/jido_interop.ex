@@ -112,14 +112,15 @@ defmodule Jido.Shell.Backend.Bash.JidoInterop do
   end
 
   defp escape_arg(arg) when is_binary(arg) do
-    if String.contains?(arg, [" ", "\t", "\"", "'", "$", "\\"]) do
-      "\"" <> String.replace(arg, ~s("), ~s(\\")) <> "\""
-    else
+    escaped =
       arg
-    end
+      |> String.replace("\\", "\\\\")
+      |> String.replace("\"", "\\\"")
+
+    "\"" <> escaped <> "\""
   end
 
-  defp escape_arg(other), do: to_string(other)
+  defp escape_arg(other), do: other |> to_string() |> escape_arg()
 
   defp run_command(state, line) do
     parent = self()
