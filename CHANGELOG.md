@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added optional per-command runtime/output limits in execution context.
 - Removed the alternate rich UI mode from the V1 public release surface and CLI flags.
 - Updated docs and examples to current names/event tuples and current package surface.
+- Use the published `jido_vfs` 1.0 Hex package instead of the Git dependency.
+- Remove the unpublished optional `sprites` package dependency from release metadata.
 
 ### Added
 - `MIGRATION.md` documenting V1-facing breaking API changes and upgrade steps.

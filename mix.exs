@@ -72,8 +72,7 @@ defmodule Jido.Shell.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.17"},
-      {:jido_vfs, github: "agentjido/jido_vfs", branch: "main"},
-      {:sprites, git: "https://github.com/mikehostetler/sprites-ex.git", optional: true},
+      {:jido_vfs, "~> 1.0"},
       {:bash,
        git: "https://github.com/tv-labs/bash.git", ref: "c1038ff83e825c29ea131bf8b728bd1672734c01", optional: true},
 
@@ -115,10 +114,10 @@ defmodule Jido.Shell.MixProject do
       licenses: ["Apache-2.0"],
       links: %{
         "Changelog" => "https://hexdocs.pm/jido_shell/changelog.html",
-        "Discord" => "https://agentjido.xyz/discord",
+        "Discord" => "https://jido.run/discord",
         "Documentation" => "https://hexdocs.pm/jido_shell",
         "GitHub" => @source_url,
-        "Website" => "https://agentjido.xyz"
+        "Website" => "https://jido.run"
       }
     ]
   end
