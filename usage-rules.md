@@ -23,6 +23,27 @@ This document provides guidance for LLMs using Jido.Shell for file and shell ope
 results = Jido.Shell.Agent.run_all(session, ["mkdir /dir", "cd /dir", "pwd"])
 ```
 
+### Optional Backends
+
+```elixir
+# Persistent sandboxed Bash
+{:ok, bash_session} =
+  Jido.Shell.Agent.new("my_workspace",
+    backend: {Jido.Shell.Backend.Bash, %{}})
+
+# Persistent sandboxed Lua VM
+{:ok, lua_session} =
+  Jido.Shell.Agent.new("my_workspace",
+    backend: {Jido.Shell.Backend.Lua, %{}})
+
+{:ok, output} =
+  Jido.Shell.Agent.run(lua_session, ~S|jido.echo("hello", "lua")|)
+```
+
+Lua scripts must call registered commands through the `jido.*` namespace. Host
+I/O, `require`, file loading, and `os.execute` are sandboxed by `Lua.new/0`;
+filesystem access goes through bridged Jido commands and the VFS.
+
 ### File Operations
 
 ```elixir
@@ -67,6 +88,7 @@ cwd = Jido.Shell.Agent.cwd(session)
 | `rm` | `rm file` | Remove file |
 | `cp` | `cp src dest` | Copy file |
 | `env` | `env VAR=value` | Set environment variable |
+| `bash` | `bash -c "script"` | Execute sandboxed Bash script |
 | `help` | `help [cmd]` | Show help |
 
 ## Best Practices

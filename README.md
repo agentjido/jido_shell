@@ -142,6 +142,46 @@ All registered Jido commands (`echo`, `ls`, `cat`, `cd`, `write`, etc.) are brid
 - Glob support covers simple `*`/`?` patterns only.
 - Cancellation uses `Bash.Session.signal/3` with `:sigint`; scripts can run `INT`/`EXIT` traps before stopping.
 
+### Lua Backend
+
+The Lua backend runs scripts in the pure-Elixir `:lua` VM. Lua globals and functions persist across calls within the same session, and registered Jido commands are available under the explicit `jido.*` namespace.
+
+**Dependency** — add the optional `:lua` package to your `mix.exs`:
+
+```elixir
+{:lua, "~> 0.4", optional: true}
+```
+
+**Starting a session:**
+
+```elixir
+{:ok, session_id} =
+  Jido.Shell.ShellSession.start_with_vfs("my_workspace",
+    backend: {Jido.Shell.Backend.Lua, %{}}
+  )
+```
+
+**Agent API:**
+
+```elixir
+{:ok, session} = Jido.Shell.Agent.new("my_workspace",
+  backend: {Jido.Shell.Backend.Lua, %{}})
+
+{:ok, output} = Jido.Shell.Agent.run(session, """
+  jido.echo("hello", "lua")
+  x = 5
+  print(x)
+""")
+```
+
+**Isolation:** `Lua.new/0` sandboxes host access by default. `io`, file loading, `require`, package loading, `os.execute`, `os.exit`, and `os.getenv` are disabled. File access is only available through bridged Jido commands such as `jido.cat`, `jido.write`, and `jido.ls`, which route through `Jido.Shell.VFS`.
+
+**Known limitations:**
+
+- Use `jido.echo`, `jido.ls`, etc.; bare command aliases are not installed.
+- `configure_network/2` is a no-op because the Lua VM exposes no network primitives.
+- Runtime and output limits are enforced by killing the eval worker; the persistent Lua holder remains reusable after timeout or cancellation.
+
 ### Sprite Backend
 
 To execute commands on Fly.io Sprites, pass a backend tuple when starting a session:
@@ -240,7 +280,7 @@ Event payloads:
 
 - `{:command_started, line}`
 - `{:output, chunk}`
-- `{:output_stderr, chunk}` (Bash backend only)
+- `{:output_stderr, chunk}`
 - `{:error, %Jido.Shell.Error{}}`
 - `{:cwd_changed, path}`
 - `:command_done`

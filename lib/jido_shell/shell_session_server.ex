@@ -268,6 +268,7 @@ defmodule Jido.Shell.ShellSessionServer do
       end)
 
     updated_state = maybe_sync_backend_cwd(updated_state, Map.get(changes, :cwd))
+    updated_state = maybe_sync_backend_env(updated_state, Map.get(changes, :env))
     {updated_state, Map.has_key?(changes, :cwd)}
   end
 
@@ -281,6 +282,14 @@ defmodule Jido.Shell.ShellSessionServer do
   end
 
   defp maybe_sync_backend_cwd(state, _cwd), do: state
+
+  defp maybe_sync_backend_env(state, nil), do: state
+
+  defp maybe_sync_backend_env(state, env) when is_map(env) do
+    %{state | backend_state: Map.put(state.backend_state, :env, env)}
+  end
+
+  defp maybe_sync_backend_env(state, _env), do: state
 
   defp broadcast(state, event) do
     for pid <- state.transports do
