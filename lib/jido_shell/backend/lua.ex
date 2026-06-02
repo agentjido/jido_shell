@@ -22,10 +22,12 @@ defmodule Jido.Shell.Backend.Lua do
   def init(config) when is_map(config) do
     persistent = Map.get(config, :persistent, true)
 
+    apis = Map.get(config, :apis, [])
+
     with :ok <- ensure_dep_available(),
          {:ok, session_pid} <- fetch_session_pid(config),
          workspace_id <- Map.get(config, :workspace_id, ""),
-         {:ok, lua_session} <- maybe_start_lua_session(persistent, workspace_id) do
+         {:ok, lua_session} <- maybe_start_lua_session(persistent, workspace_id, apis) do
       {:ok,
        %{
          lua_session: lua_session,
@@ -36,7 +38,8 @@ defmodule Jido.Shell.Backend.Lua do
          cwd: Map.get(config, :cwd, "/"),
          env: Map.get(config, :env, %{}),
          max_heap_size: Map.get(config, :max_heap_size),
-         persistent: persistent
+         persistent: persistent,
+         apis: apis
        }}
     end
   end
@@ -64,7 +67,8 @@ defmodule Jido.Shell.Backend.Lua do
               state.workspace_id,
               line,
               context,
-              Map.get(state, :max_heap_size)
+              Map.get(state, :max_heap_size),
+              Map.get(state, :apis, [])
             )
           else
             spawn_eval_worker(watcher_pid, ref, state.lua_session, line, context, Map.get(state, :max_heap_size))
@@ -124,15 +128,17 @@ defmodule Jido.Shell.Backend.Lua do
     end
   end
 
-  defp maybe_start_lua_session(false, _workspace_id), do: {:ok, nil}
-  defp maybe_start_lua_session(_persistent, workspace_id), do: start_lua_session(workspace_id)
+  defp maybe_start_lua_session(false, _workspace_id, _apis), do: {:ok, nil}
+  defp maybe_start_lua_session(_persistent, workspace_id, apis), do: start_lua_session(workspace_id, apis)
 
-  defp start_lua_session(workspace_id) do
+  defp start_lua_session(workspace_id, apis \\ []) do
     lua =
       Lua.new()
       |> Lua.load_api(JidoApi)
       |> JidoApi.install_globals()
       |> Lua.set!([:JIDO_WORKSPACE_ID], workspace_id)
+
+    lua = Enum.reduce(apis, lua, &Lua.load_api(&2, &1))
 
     Session.new(lua)
   rescue
@@ -163,22 +169,26 @@ defmodule Jido.Shell.Backend.Lua do
     )
   end
 
-  defp spawn_eval_worker_stateless(watcher_pid, ref, workspace_id, line, context, max_heap_size) do
+  defp spawn_eval_worker_stateless(watcher_pid, ref, workspace_id, line, context, max_heap_size, apis \\ []) do
     :erlang.spawn_opt(
       fn ->
-        result = eval_stateless(workspace_id, line, context)
+        result = eval_stateless(workspace_id, line, context, apis)
         send(watcher_pid, {ref, {:done, result}})
       end,
       spawn_opts(max_heap_size)
     )
   end
 
-  defp eval_stateless(workspace_id, script, context) do
+  defp eval_stateless(workspace_id, script, context, apis \\ []) do
     lua =
       Lua.new()
       |> Lua.load_api(JidoApi)
       |> JidoApi.install_globals()
       |> Lua.set!([:JIDO_WORKSPACE_ID], workspace_id)
+
+    lua =
+      apis
+      |> Enum.reduce(lua, &Lua.load_api(&2, &1))
       |> Lua.put_private(JidoApi.context_key(), context)
 
     {_return, new_lua} = Lua.eval!(lua, script)
