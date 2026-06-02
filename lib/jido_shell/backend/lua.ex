@@ -131,7 +131,7 @@ defmodule Jido.Shell.Backend.Lua do
   defp maybe_start_lua_session(false, _workspace_id, _apis), do: {:ok, nil}
   defp maybe_start_lua_session(_persistent, workspace_id, apis), do: start_lua_session(workspace_id, apis)
 
-  defp start_lua_session(workspace_id, apis \\ []) do
+  defp start_lua_session(workspace_id, apis) do
     lua =
       Lua.new()
       |> Lua.load_api(JidoApi)
@@ -169,7 +169,7 @@ defmodule Jido.Shell.Backend.Lua do
     )
   end
 
-  defp spawn_eval_worker_stateless(watcher_pid, ref, workspace_id, line, context, max_heap_size, apis \\ []) do
+  defp spawn_eval_worker_stateless(watcher_pid, ref, workspace_id, line, context, max_heap_size, apis) do
     :erlang.spawn_opt(
       fn ->
         result = eval_stateless(workspace_id, line, context, apis)
@@ -179,7 +179,7 @@ defmodule Jido.Shell.Backend.Lua do
     )
   end
 
-  defp eval_stateless(workspace_id, script, context, apis \\ []) do
+  defp eval_stateless(workspace_id, script, context, apis) do
     lua =
       Lua.new()
       |> Lua.load_api(JidoApi)
