@@ -96,8 +96,9 @@ Sessions run with `Jido.Shell.Backend.Local` by default.
 
 The Bash backend hands entire command lines to a persistent `Bash.Session` process, so loops, conditionals, variables, pipes, and arithmetic expansion all work as in real Bash. State persists across calls within the same session.
 
-The `:bash` package is a required `jido_shell` dependency, so consumers do not
-need to declare it separately.
+The Bash backend is optional. Projects that use `Jido.Shell.Backend.Bash` must
+add the `:bash` package; projects that do not use this backend compile without
+it.
 
 ```elixir
 {:bash,

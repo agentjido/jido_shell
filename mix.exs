@@ -73,8 +73,7 @@ defmodule Jido.Shell.MixProject do
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.17"},
       {:jido_vfs, "~> 1.0"},
-      {:bash,
-       git: "https://github.com/tv-labs/bash.git", ref: "c1038ff83e825c29ea131bf8b728bd1672734c01"},
+      bash_dep(),
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -104,6 +103,18 @@ defmodule Jido.Shell.MixProject do
         "dialyzer"
       ]
     ]
+  end
+
+  defp bash_dep do
+    if Mix.env() in [:dev, :test] do
+      {:bash,
+       git: "https://github.com/tv-labs/bash.git",
+       ref: "c1038ff83e825c29ea131bf8b728bd1672734c01",
+       only: [:dev, :test],
+       optional: true}
+    else
+      {:bash, "~> 0.5.1", optional: true}
+    end
   end
 
   defp package do
