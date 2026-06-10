@@ -68,3 +68,7 @@ Events:
 - Use `Jido.Shell.Error` for structured errors
 - Keep workspace IDs as strings (`String.t()`)
 - Avoid runtime atom generation from user input
+
+## Release Hygiene
+
+- Do not modify `CHANGELOG.md`; release notes are generated from Git history during release, so keep changes focused on proper Conventional Commits.

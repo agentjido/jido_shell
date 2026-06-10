@@ -23,7 +23,7 @@ This document provides guidance for LLMs using Jido.Shell for file and shell ope
 results = Jido.Shell.Agent.run_all(session, ["mkdir /dir", "cd /dir", "pwd"])
 ```
 
-### Optional Backends
+### Sandboxed Backends
 
 ```elixir
 # Persistent sandboxed Bash
