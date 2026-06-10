@@ -162,10 +162,6 @@ defmodule Jido.Shell.Environment.Sprite do
     end
   end
 
-  defp destroy_sprite(nil, _client, _sprites_mod), do: {:error, :missing_sprite_name}
-  defp destroy_sprite("", _client, _sprites_mod), do: {:error, :missing_sprite_name}
-  defp destroy_sprite(_sprite_name, nil, _sprites_mod), do: {:error, :missing_sprites_client}
-
   defp destroy_sprite(sprite_name, client, sprites_mod) do
     with true <- supports?(sprites_mod, :sprite, 2),
          true <- supports?(sprites_mod, :destroy, 1) do

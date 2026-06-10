@@ -74,7 +74,10 @@ defmodule Jido.Shell.MixProject do
       {:zoi, "~> 0.17"},
       {:jido_vfs, "~> 1.0"},
       {:bash,
-       git: "https://github.com/tv-labs/bash.git", ref: "c1038ff83e825c29ea131bf8b728bd1672734c01", optional: true},
+       git: "https://github.com/tv-labs/bash.git",
+       ref: "c1038ff83e825c29ea131bf8b728bd1672734c01",
+       only: [:dev, :test],
+       optional: true},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -108,8 +111,7 @@ defmodule Jido.Shell.MixProject do
 
   defp package do
     [
-      files:
-        ~w(lib mix.exs LICENSE README.md MIGRATION.md CHANGELOG.md CONTRIBUTING.md GUARDRAILS.md AGENTS.md usage-rules.md .formatter.exs),
+      files: package_files(),
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -121,6 +123,21 @@ defmodule Jido.Shell.MixProject do
       }
     ]
   end
+
+  defp package_files do
+    lib_files =
+      "lib/**/*"
+      |> Path.wildcard()
+      |> Enum.reject(&File.dir?/1)
+      |> Enum.reject(&bash_backend_file?/1)
+
+    lib_files ++
+      ~w(mix.exs LICENSE README.md MIGRATION.md CHANGELOG.md CONTRIBUTING.md GUARDRAILS.md AGENTS.md usage-rules.md .formatter.exs)
+  end
+
+  defp bash_backend_file?("lib/jido_shell/backend/bash.ex"), do: true
+  defp bash_backend_file?("lib/jido_shell/backend/bash/" <> _), do: true
+  defp bash_backend_file?(_path), do: false
 
   defp docs do
     [

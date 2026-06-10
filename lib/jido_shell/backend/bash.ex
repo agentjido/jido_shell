@@ -62,7 +62,8 @@ defmodule Jido.Shell.Backend.Bash do
 
       Jido.Shell.ShellSession.run_command(sid, "for i in 1 2 3; do echo $i; done")
 
-  Requires the optional `:bash` dependency to be compiled into the release.
+  Requires the compatible upstream `:bash` Git dependency until the next
+  `tv-labs/bash` Hex release includes `Bash.Session.signal/3`.
   """
 
   @behaviour Jido.Shell.Backend

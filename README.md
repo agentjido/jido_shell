@@ -96,13 +96,15 @@ Sessions run with `Jido.Shell.Backend.Local` by default.
 
 The Bash backend hands entire command lines to a persistent `Bash.Session` process, so loops, conditionals, variables, pipes, and arithmetic expansion all work as in real Bash. State persists across calls within the same session.
 
-**Dependency** — add the optional `:bash` package to your `mix.exs`:
+The Bash backend currently depends on upstream `tv-labs/bash` changes that are
+newer than the latest Hex release. Until those changes are published, the Bash
+backend is available from source/Git builds and is excluded from the Hex
+package.
 
 ```elixir
 {:bash,
  git: "https://github.com/tv-labs/bash.git",
- ref: "c1038ff83e825c29ea131bf8b728bd1672734c01",
- optional: true}
+ ref: "c1038ff83e825c29ea131bf8b728bd1672734c01"}
 ```
 
 **Starting a session:**
