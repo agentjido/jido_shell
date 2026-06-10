@@ -78,7 +78,7 @@ defmodule Jido.Shell.MixProject do
        ref: "c1038ff83e825c29ea131bf8b728bd1672734c01",
        only: [:dev, :test],
        optional: true},
-      {:lua, "~> 0.4"},
+      {:lua, "~> 1.0.0-rc.1"},
 
       # Dev/Test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
