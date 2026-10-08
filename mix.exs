@@ -80,7 +80,7 @@ defmodule Jido.Shell.MixProject do
       # Runtime dependencies
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
-      {:zoi, "~> 0.17"},
+      {:zoi, "~> 0.18.11"},
       {:jido_vfs, "~> 1.0"},
       {:bash,
        git: "https://github.com/tv-labs/bash.git",
