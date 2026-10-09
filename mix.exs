@@ -84,7 +84,7 @@ defmodule Jido.Shell.MixProject do
       {:jido_vfs, "~> 1.0"},
       {:bash,
        git: "https://github.com/tv-labs/bash.git",
-       ref: "c1038ff83e825c29ea131bf8b728bd1672734c01",
+       ref: "6e5b2c5381b9f3537419ccadf275104d9f75db7c",
        only: [:dev, :test],
        optional: true},
       {:lua, "~> 1.0.0-rc.1"},
