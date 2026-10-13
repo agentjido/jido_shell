@@ -213,10 +213,9 @@ else
     @moduledoc """
     Placeholder for the optional `:bash` interop bridge.
 
-    Git dependencies compile the full source tree, but the `:bash` dependency is
-    intentionally optional so Hex packages can exclude the bash backend. This
-    fallback lets the package compile when `:bash` is not present; the bash
-    backend still reports `:bash_dep_unavailable` from init.
+    The Hex package includes the Bash backend, but `:bash` is an optional
+    dependency. This fallback lets the package compile when `:bash` is not
+    present; the Bash backend reports `:bash_dep_unavailable` from init.
     """
 
     @doc false

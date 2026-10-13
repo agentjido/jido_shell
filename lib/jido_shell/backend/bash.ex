@@ -62,11 +62,15 @@ defmodule Jido.Shell.Backend.Bash do
 
       Jido.Shell.ShellSession.run_command(sid, "for i in 1 2 3; do echo $i; done")
 
-  Requires the compatible upstream `:bash` Git dependency until the next
-  `tv-labs/bash` Hex release includes `Bash.Session.signal/3`.
+  Add `{:bash, "~> 0.6.0"}` to your application's dependencies to use this
+  backend. Bash 0.6.0 includes `Bash.Session.signal/3` for cancellation.
   """
 
   @behaviour Jido.Shell.Backend
+
+  unless Code.ensure_loaded?(Bash.Session) do
+    @compile {:no_warn_undefined, [Bash, Bash.Session, Bash.ExecutionResult]}
+  end
 
   alias Jido.Shell.Backend.Bash.JidoInterop
   alias Jido.Shell.Backend.Bash.VfsAdapter
