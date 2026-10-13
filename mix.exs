@@ -82,11 +82,7 @@ defmodule Jido.Shell.MixProject do
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.18.11"},
       {:jido_vfs, "~> 1.0"},
-      {:bash,
-       git: "https://github.com/tv-labs/bash.git",
-       ref: "6e5b2c5381b9f3537419ccadf275104d9f75db7c",
-       only: [:dev, :test],
-       optional: true},
+      {:bash, "~> 0.6.0", optional: true},
       {:lua, "~> 1.0.0-rc.1"},
 
       # Dev/Test dependencies
@@ -139,15 +135,10 @@ defmodule Jido.Shell.MixProject do
       "lib/**/*"
       |> Path.wildcard()
       |> Enum.reject(&File.dir?/1)
-      |> Enum.reject(&bash_backend_file?/1)
 
     lib_files ++
       ~w(mix.exs LICENSE README.md MIGRATION.md CHANGELOG.md CONTRIBUTING.md GUARDRAILS.md AGENTS.md usage-rules.md .formatter.exs)
   end
-
-  defp bash_backend_file?("lib/jido_shell/backend/bash.ex"), do: true
-  defp bash_backend_file?("lib/jido_shell/backend/bash/" <> _), do: true
-  defp bash_backend_file?(_path), do: false
 
   defp docs do
     [
