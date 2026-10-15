@@ -32,6 +32,13 @@ defmodule Jido.Shell.ShellSession do
   """
   @spec start(workspace_id(), keyword()) :: {:ok, String.t()} | {:error, Error.t() | term()}
   def start(workspace_id, opts \\ []) do
+    case start_process(workspace_id, opts) do
+      {:ok, id, _pid} -> {:ok, id}
+      error -> error
+    end
+  end
+
+  defp start_process(workspace_id, opts) do
     with :ok <- validate_workspace_id(workspace_id) do
       session_id = Keyword.get_lazy(opts, :session_id, &generate_id/0)
 
@@ -40,17 +47,67 @@ defmodule Jido.Shell.ShellSession do
         Keyword.merge(opts, session_id: session_id, workspace_id: workspace_id)
       }
 
+      child_spec =
+        if Keyword.has_key?(opts, :owner) or match?(%{attached_filesystem: true}, Keyword.get(opts, :meta)) do
+          Supervisor.child_spec(child_spec, restart: :temporary)
+        else
+          child_spec
+        end
+
       case DynamicSupervisor.start_child(Jido.Shell.SessionSupervisor, child_spec) do
-        {:ok, _pid} -> {:ok, session_id}
+        {:ok, pid} -> {:ok, session_id, pid}
         {:error, _} = error -> error
       end
     end
   end
 
   @doc """
+  Starts a session against an existing filesystem. Storage remains caller-owned.
+  A private routing namespace is removed on session shutdown or startup failure.
+  """
+  @spec start_with_filesystem(Jido.VFS.filesystem(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def start_with_filesystem({adapter, _} = fs, opts \\ []) when is_atom(adapter) do
+    case start_attached(fs, opts) do
+      {:ok, id, _pid} -> {:ok, id}
+      error -> error
+    end
+  end
+
+  @doc "Starts a borrowed filesystem session and returns its exact process identity."
+  @spec start_with_filesystem_pid(Jido.VFS.filesystem(), keyword()) :: {:ok, pid()} | {:error, term()}
+  def start_with_filesystem_pid(fs, opts \\ []) do
+    case start_attached(fs, opts) do
+      {:ok, _id, pid} -> {:ok, pid}
+      error -> error
+    end
+  end
+
+  defp start_attached(fs, opts) do
+    workspace_id = "attached-" <> generate_id()
+
+    meta = Keyword.get(opts, :meta, %{})
+
+    with true <- is_map(meta),
+         opts = Keyword.put(opts, :meta, Map.put(meta, :attached_filesystem, true)),
+         :ok <- Jido.Shell.VFS.MountTable.attach(workspace_id, "/", fs) do
+      case start_process(workspace_id, opts) do
+        {:ok, _, _} = ok ->
+          ok
+
+        error ->
+          Jido.Shell.VFS.unmount_workspace(workspace_id)
+          error
+      end
+    else
+      false -> {:error, Error.session(:invalid_metadata, %{})}
+      error -> error
+    end
+  end
+
+  @doc """
   Stops a session.
   """
-  @spec stop(String.t()) :: :ok | {:error, :not_found | term()}
+  @spec stop(String.t() | pid()) :: :ok | {:error, :not_found | term()}
   def stop(session_id) do
     case lookup(session_id) do
       {:ok, pid} ->
@@ -111,10 +168,14 @@ defmodule Jido.Shell.ShellSession do
       iex> Jido.Shell.ShellSession.lookup("nonexistent")
       {:error, :not_found}
   """
-  @spec lookup(String.t()) :: {:ok, pid()} | {:error, :not_found}
+  @spec lookup(String.t() | pid()) :: {:ok, pid()} | {:error, :not_found}
+  def lookup(pid) when is_pid(pid) do
+    if Process.alive?(pid), do: {:ok, pid}, else: {:error, :not_found}
+  end
+
   def lookup(session_id) when is_binary(session_id) do
     case Registry.lookup(Jido.Shell.SessionRegistry, session_id) do
-      [{pid, _}] -> {:ok, pid}
+      [{pid, _}] -> lookup(pid)
       [] -> {:error, :not_found}
     end
   end

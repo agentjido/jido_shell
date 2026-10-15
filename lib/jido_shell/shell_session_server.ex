@@ -33,7 +33,7 @@ defmodule Jido.Shell.ShellSessionServer do
   - `{:jido_shell_session, session_id, {:output_stderr, chunk}}`
   - `{:jido_shell_session, session_id, :command_done}`
   """
-  @spec subscribe(String.t(), pid(), keyword()) ::
+  @spec subscribe(String.t() | pid(), pid(), keyword()) ::
           {:ok, :subscribed} | {:error, Error.t()}
   def subscribe(session_id, transport_pid, opts \\ []) do
     with_session(session_id, fn pid ->
@@ -44,7 +44,7 @@ defmodule Jido.Shell.ShellSessionServer do
   @doc """
   Unsubscribes a transport from session events.
   """
-  @spec unsubscribe(String.t(), pid()) ::
+  @spec unsubscribe(String.t() | pid(), pid()) ::
           {:ok, :unsubscribed} | {:error, Error.t()}
   def unsubscribe(session_id, transport_pid) do
     with_session(session_id, fn pid ->
@@ -55,7 +55,7 @@ defmodule Jido.Shell.ShellSessionServer do
   @doc """
   Gets a snapshot of the current session state.
   """
-  @spec get_state(String.t()) :: {:ok, State.t()} | {:error, Error.t()}
+  @spec get_state(String.t() | pid()) :: {:ok, State.t()} | {:error, Error.t()}
   def get_state(session_id) do
     with_session(session_id, fn pid ->
       GenServer.call(pid, :get_state)
@@ -68,7 +68,7 @@ defmodule Jido.Shell.ShellSessionServer do
   `opts` are passed to the command task context (for example
   `execution_context: %{network: %{allow_domains: [...]}}`).
   """
-  @spec run_command(String.t(), String.t(), keyword()) ::
+  @spec run_command(String.t() | pid(), String.t(), keyword()) ::
           {:ok, :accepted} | {:error, Error.t()}
   def run_command(session_id, line, opts \\ []) do
     with_session(session_id, fn pid ->
@@ -96,6 +96,7 @@ defmodule Jido.Shell.ShellSessionServer do
     # for backends that spawn external resources (SSH connections, Bash
     # sessions, Sprite handles, …).
     Process.flag(:trap_exit, true)
+    if owner = Keyword.get(opts, :owner), do: Process.put(:session_owner_ref, Process.monitor(owner))
 
     session_id = Keyword.fetch!(opts, :session_id)
     workspace_id = Keyword.fetch!(opts, :workspace_id)
@@ -117,6 +118,10 @@ defmodule Jido.Shell.ShellSessionServer do
              backend: backend,
              backend_state: backend_state
            }) do
+      if Map.get(meta, :attached_filesystem, false) do
+        :ok = Jido.Shell.VFS.MountTable.track(workspace_id, self())
+      end
+
       {:ok, state}
     else
       {:error, %Error{} = error} ->
@@ -129,7 +134,20 @@ defmodule Jido.Shell.ShellSessionServer do
 
   @impl true
   def terminate(_reason, state) do
+    if state.current_command do
+      _ =
+        safe_backend_cancel(
+          state.backend,
+          state.backend_state,
+          Map.get(state.current_command, :backend_ref) || state.current_command.task
+        )
+    end
+
     _ = safe_backend_terminate(state.backend, state.backend_state)
+
+    if Map.get(state.meta, :attached_filesystem, false),
+      do: Jido.Shell.VFS.unmount_workspace(state.workspace_id)
+
     :ok
   end
 
@@ -223,6 +241,9 @@ defmodule Jido.Shell.ShellSessionServer do
   @impl true
   def handle_info({:DOWN, ref, :process, pid, reason}, state) do
     cond do
+      ref == Process.get(:session_owner_ref) ->
+        {:stop, :normal, state}
+
       state.current_command && state.current_command.ref == ref ->
         case reason do
           :normal ->
@@ -524,7 +545,7 @@ defmodule Jido.Shell.ShellSessionServer do
     _, _ -> :ok
   end
 
-  defp with_session(session_id, fun) when is_binary(session_id) and byte_size(session_id) > 0 do
+  defp with_session(session_id, fun) when is_pid(session_id) or (is_binary(session_id) and byte_size(session_id) > 0) do
     case ShellSession.lookup(session_id) do
       {:ok, pid} ->
         try do

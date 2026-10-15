@@ -106,6 +106,33 @@ defmodule Jido.Shell.VFS.MountTable do
     end
   end
 
+  @doc "Attaches caller-owned storage without starting or stopping it."
+  @spec attach(String.t(), String.t(), Jido.VFS.filesystem()) :: :ok | {:error, term()}
+  def attach(workspace_id, path, filesystem),
+    do: GenServer.call(__MODULE__, {:attach, workspace_id, path, filesystem})
+
+  @doc false
+  def track(workspace_id, owner), do: GenServer.call(__MODULE__, {:track, workspace_id, owner})
+
+  @impl true
+  def handle_call({:attach, workspace_id, path, {adapter, _} = filesystem}, _from, state) do
+    path = normalize_path(path)
+
+    if path_mounted?(workspace_id, path) do
+      {:reply, {:error, :path_already_mounted}, state}
+    else
+      mount = %Mount{path: path, adapter: adapter, filesystem: filesystem, opts: [], child_pid: nil, ownership: :none}
+      :ets.insert(@table, {workspace_id, mount})
+      {:reply, :ok, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:track, workspace_id, owner}, _from, state) do
+    ref = Process.monitor(owner)
+    {:reply, :ok, Map.put(state, ref, workspace_id)}
+  end
+
   @impl true
   def handle_call({:mount, workspace_id, path, adapter, opts}, _from, state) do
     normalized_path = normalize_path(path)
@@ -143,6 +170,7 @@ defmodule Jido.Shell.VFS.MountTable do
           :ok
       end
 
+    state = retire_monitor_if_empty(state, workspace_id)
     {:reply, reply, state}
   end
 
@@ -160,7 +188,37 @@ defmodule Jido.Shell.VFS.MountTable do
       maybe_stop_filesystem(mount)
     end)
 
+    state = retire_monitor_if_empty(state, workspace_id)
+
     {:reply, :ok, state}
+  end
+
+  @impl true
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
+    case Map.pop(state, ref) do
+      {nil, rest} ->
+        {:noreply, rest}
+
+      {workspace_id, rest} ->
+        # Attached mounts borrow storage; only remove routing entries.
+        :ets.delete(@table, workspace_id)
+        {:noreply, rest}
+    end
+  end
+
+  defp retire_monitor_if_empty(state, workspace_id) do
+    if list(workspace_id) == [] do
+      Enum.reduce(state, state, fn {ref, tracked_id}, acc ->
+        if tracked_id == workspace_id do
+          Process.demonitor(ref, [:flush])
+          Map.delete(acc, ref)
+        else
+          acc
+        end
+      end)
+    else
+      state
+    end
   end
 
   defp ensure_table do

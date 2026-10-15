@@ -47,12 +47,11 @@ defmodule Jido.Shell.Backend.Local do
   end
 
   @impl true
-  def cancel(_state, command_ref) when is_pid(command_ref) do
-    if Process.alive?(command_ref) do
-      Process.exit(command_ref, :shutdown)
+  def cancel(state, command_ref) when is_pid(command_ref) do
+    case Task.Supervisor.terminate_child(state.task_supervisor, command_ref) do
+      :ok -> :ok
+      {:error, :not_found} -> :ok
     end
-
-    :ok
   end
 
   def cancel(_state, _command_ref), do: {:error, :invalid_command_ref}

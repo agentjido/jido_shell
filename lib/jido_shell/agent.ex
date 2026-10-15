@@ -26,7 +26,7 @@ defmodule Jido.Shell.Agent do
   alias Jido.Shell.ShellSession
   alias Jido.Shell.ShellSessionServer
 
-  @type session :: String.t()
+  @type session :: String.t() | pid()
   @type workspace_id :: String.t()
   @type result :: {:ok, String.t()} | {:error, Jido.Shell.Error.t()}
 
@@ -37,6 +37,9 @@ defmodule Jido.Shell.Agent do
   """
   @spec new(workspace_id() | term(), keyword()) :: {:ok, session()} | {:error, term()}
   def new(workspace_id, opts \\ [])
+
+  def new({adapter, _} = filesystem, opts) when is_atom(adapter),
+    do: ShellSession.start_with_filesystem(filesystem, opts)
 
   def new(workspace_id, opts) when is_binary(workspace_id) do
     ShellSession.start_with_vfs(workspace_id, opts)
@@ -57,7 +60,17 @@ defmodule Jido.Shell.Agent do
   - `:execution_context` - Per-command execution context passed to sandboxed commands
   """
   @spec run(session(), String.t(), keyword()) :: result()
-  def run(session_id, command, opts \\ []) do
+  def run(session, command, opts \\ [])
+
+  def run(pid, command, opts) when is_pid(pid) do
+    with {:ok, state} <- ShellSessionServer.get_state(pid) do
+      run_session(state.id, pid, command, opts)
+    end
+  end
+
+  def run(session_id, command, opts), do: run_session(session_id, session_id, command, opts)
+
+  defp run_session(session_id, pid, command, opts) do
     timeout = Keyword.get(opts, :timeout, 30_000)
 
     command_opts =
@@ -67,17 +80,17 @@ defmodule Jido.Shell.Agent do
         Map.put_new(ctx, :max_runtime_ms, timeout)
       end)
 
-    case ShellSessionServer.subscribe(session_id, self()) do
+    case ShellSessionServer.subscribe(pid, self()) do
       {:ok, :subscribed} ->
         drain_session_events(session_id)
 
         result =
-          case ShellSessionServer.run_command(session_id, command, command_opts) do
+          case ShellSessionServer.run_command(pid, command, command_opts) do
             {:ok, :accepted} -> collect_output(session_id, command, [], timeout, false)
             {:error, _} = error -> error
           end
 
-        _ = ShellSessionServer.unsubscribe(session_id, self())
+        _ = ShellSessionServer.unsubscribe(pid, self())
         result
 
       {:error, _} = error ->
