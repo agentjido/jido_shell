@@ -313,3 +313,25 @@ Apache-2.0. See [LICENSE](LICENSE).
 - Unit/integration-lite tests: `mix test`
 - Full quality gate: `mix quality`
 - Optional flaky cases: `mix test --include flaky`
+
+## Caller-owned filesystems
+
+Attach a session to an existing VFS filesystem without transferring ownership:
+
+```elixir
+{:ok, session} = Jido.Shell.Agent.new(filesystem)
+{:ok, output} = Jido.Shell.Agent.run(session, "cat /file.txt")
+:ok = Jido.Shell.Agent.stop(session)
+# The caller's filesystem remains available.
+```
+
+`ShellSession.start_with_filesystem/2` provides the same attachment operation.
+Each session gets a private routing namespace, current directory, and environment.
+Stopping the session removes routing entries but does not stop storage. Startup
+failure also releases routing entries. An optional `owner: pid` stops the session
+when that process exits. Existing workspace-ID APIs remain available.
+
+The local backend waits for command task termination on cancellation and session
+shutdown. A command sequence is not a filesystem transaction: earlier commands
+can have completed before cancellation. Use VFS checked edits when a source edit
+must be atomic. External backend cleanup follows each backend's contract.
