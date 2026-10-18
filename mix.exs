@@ -81,7 +81,7 @@ defmodule Jido.Shell.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.18.11"},
-      {:jido_vfs, path: "../jido_vfs", override: true},
+      vfs_dep(),
       {:bash, "~> 0.6.0", optional: true},
       {:lua, "~> 1.0.0-rc.1"},
 
@@ -98,6 +98,14 @@ defmodule Jido.Shell.MixProject do
       # Code generation
       {:igniter, "~> 0.7", optional: true}
     ]
+  end
+
+  defp vfs_dep do
+    if File.regular?(Path.expand("../jido_vfs/mix.exs", __DIR__)) do
+      {:jido_vfs, path: "../jido_vfs", override: true}
+    else
+      {:jido_vfs, "~> 1.0"}
+    end
   end
 
   defp aliases do
