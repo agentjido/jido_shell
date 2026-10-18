@@ -279,14 +279,12 @@ defmodule Jido.Shell.ShellSession do
   end
 
   defp safe_get_state(pid) when is_pid(pid) do
-    try do
-      case GenServer.call(pid, :get_state, 1_000) do
-        {:ok, state} -> {:ok, state}
-        _ -> :error
-      end
-    catch
-      :exit, _ -> :error
+    case GenServer.call(pid, :get_state, 1_000) do
+      {:ok, state} -> {:ok, state}
+      _ -> :error
     end
+  catch
+    :exit, _ -> :error
   end
 
   defp validate_workspace_id(workspace_id) when is_binary(workspace_id) do

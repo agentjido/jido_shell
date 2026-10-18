@@ -51,9 +51,7 @@ defmodule Jido.Shell.Command.Parser do
       {:error, :empty_command}
     else
       with {:ok, tokens} <- tokenize(trimmed),
-           {:ok, commands} <- build_program(tokens) do
-        {:ok, commands}
-      end
+           do: build_program(tokens)
     end
   end
 

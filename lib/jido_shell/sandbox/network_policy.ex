@@ -57,9 +57,7 @@ defmodule Jido.Shell.Sandbox.NetworkPolicy do
 
     with :ok <- check_blocklists(line, command, endpoints, policy),
          :ok <- check_allowlists(line, command, endpoints, policy),
-         :ok <- check_default(line, command, policy) do
-      :ok
-    end
+         do: check_default(line, command, policy)
   end
 
   defp check_blocklists(line, command, endpoints, policy) do

@@ -29,9 +29,7 @@ defmodule Jido.Shell.Command.Ls do
     case Jido.Shell.VFS.list_dir(state.workspace_id, path) do
       {:ok, entries} ->
         output =
-          entries
-          |> Enum.map(&format_entry/1)
-          |> Enum.join("\n")
+          Enum.map_join(entries, "\n", &format_entry/1)
 
         if output != "" do
           emit.({:output, output <> "\n"})

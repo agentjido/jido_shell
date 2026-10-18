@@ -88,9 +88,7 @@ defmodule Jido.Shell.Backend.Lua.JidoApi do
     context = fetch_context!(lua)
 
     output =
-      args
-      |> Enum.map(&lua_to_string/1)
-      |> Enum.join("\t")
+      Enum.map_join(args, "\t", &lua_to_string/1)
 
     context.emit.({:output, output <> "\n"})
     {[], lua}

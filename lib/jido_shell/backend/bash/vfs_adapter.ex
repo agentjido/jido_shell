@@ -119,26 +119,24 @@ if Code.ensure_loaded?(Bash.Filesystem) do
       dir = Path.dirname(pattern)
       base = Path.basename(pattern)
 
-      cond do
-        # Only handle simple `*`/`?` patterns in the last path segment.
-        not simple_pattern?(base) ->
-          require Logger
-          Logger.warning("Jido.Shell.Backend.Bash.VfsAdapter: unsupported glob #{inspect(pattern)}")
-          []
+      # Only handle simple `*`/`?` patterns in the last path segment.
+      if simple_pattern?(base) do
+        case VFS.list_dir(ws(config), normalize(dir)) do
+          {:ok, entries} ->
+            regex = compile_glob(base)
 
-        true ->
-          case VFS.list_dir(ws(config), normalize(dir)) do
-            {:ok, entries} ->
-              regex = compile_glob(base)
+            entries
+            |> Enum.filter(fn entry -> Regex.match?(regex, entry.name) end)
+            |> Enum.map(fn entry -> Path.join(normalize(dir), entry.name) end)
+            |> Enum.sort()
 
-              entries
-              |> Enum.filter(fn entry -> Regex.match?(regex, entry.name) end)
-              |> Enum.map(fn entry -> Path.join(normalize(dir), entry.name) end)
-              |> Enum.sort()
-
-            {:error, _} ->
-              []
-          end
+          {:error, _} ->
+            []
+        end
+      else
+        require Logger
+        Logger.warning("Jido.Shell.Backend.Bash.VfsAdapter: unsupported glob #{inspect(pattern)}")
+        []
       end
     end
 

@@ -256,8 +256,7 @@ defmodule Jido.Shell.Backend.Bash do
     |> Map.keys()
     |> Enum.sort()
     |> Enum.reject(&(&1 in skip))
-    |> Enum.map(fn name -> "#{name}() { jido.#{name} \"$@\"; }" end)
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", fn name -> "#{name}() { jido.#{name} \"$@\"; }" end)
   end
 
   defp command_line(command, []), do: command
@@ -404,11 +403,9 @@ defmodule Jido.Shell.Backend.Bash do
   defp exit_code(%{exit_code: code}) when is_integer(code), do: code
 
   defp exit_code(execution) do
-    try do
-      Bash.ExecutionResult.exit_code(execution)
-    rescue
-      _ -> nil
-    end
+    Bash.ExecutionResult.exit_code(execution)
+  rescue
+    _ -> nil
   end
 
   # After each command, pull the session's current working directory and, if it

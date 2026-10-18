@@ -297,9 +297,10 @@ defmodule Jido.Shell.Backend.Sprite do
       {:ok, result} ->
         case parse_cmd_result(result) do
           {:ok, output, 0} ->
-            with :ok <- maybe_emit_output(state.session_pid, output, output_limit) do
-              send_finished(state.session_pid, {:ok, nil})
-            else
+            case maybe_emit_output(state.session_pid, output, output_limit) do
+              :ok ->
+                send_finished(state.session_pid, {:ok, nil})
+
               {:error, %Error{} = error} ->
                 send_finished(state.session_pid, {:error, error})
             end

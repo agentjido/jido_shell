@@ -25,11 +25,10 @@ defmodule Jido.Shell.Command.Help do
         output =
           Jido.Shell.Command.Registry.list()
           |> Enum.sort()
-          |> Enum.map(fn name ->
+          |> Enum.map_join("\n", fn name ->
             {:ok, module} = Jido.Shell.Command.Registry.lookup(name)
             "  #{name} - #{module.summary()}"
           end)
-          |> Enum.join("\n")
 
         emit.({:output, "Available commands:\n#{output}\n"})
         {:ok, nil}

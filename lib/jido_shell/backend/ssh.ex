@@ -367,9 +367,7 @@ defmodule Jido.Shell.Backend.SSH do
 
   defp remote_command(shell, line, cwd, env) do
     env_prefix =
-      env
-      |> Enum.map(fn {k, v} -> "#{k}=#{shell_escape(v)}" end)
-      |> Enum.join(" ")
+      Enum.map_join(env, " ", fn {k, v} -> "#{k}=#{shell_escape(v)}" end)
 
     case env_prefix do
       "" -> "cd #{shell_escape(cwd)} && #{shell} -lc #{shell_escape(line)}"

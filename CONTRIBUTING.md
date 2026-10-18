@@ -31,7 +31,7 @@ See [GUARDRAILS.md](GUARDRAILS.md) for extension guidance.
 ```bash
 mix format --check-formatted
 mix compile --warnings-as-errors
-mix credo --min-priority higher
+mix credo --strict
 mix dialyzer
 mix docs
 ```

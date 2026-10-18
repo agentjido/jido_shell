@@ -45,9 +45,7 @@ defmodule Jido.Shell.StreamJson do
            command,
            timeout,
            heartbeat_interval_ms,
-           on_event,
-           on_raw_line,
-           on_heartbeat
+           {on_event, on_raw_line, on_heartbeat}
          ) do
       {:ok, _output, _events} = ok ->
         ok
@@ -74,9 +72,7 @@ defmodule Jido.Shell.StreamJson do
          command,
          timeout,
          heartbeat_interval_ms,
-         on_event,
-         on_raw_line,
-         on_heartbeat
+         {on_event, on_raw_line, on_heartbeat}
        ) do
     wrapped = "cd #{Exec.escape_path(cwd)} && #{command}"
 
@@ -91,11 +87,8 @@ defmodule Jido.Shell.StreamJson do
           {:ok, :accepted} ->
             collect_stream_output(
               session_id,
-              deadline_ms,
-              heartbeat_interval_ms,
-              on_event,
-              on_raw_line,
-              on_heartbeat,
+              {deadline_ms, heartbeat_interval_ms},
+              {on_event, on_raw_line, on_heartbeat},
               "",
               [],
               [],
@@ -134,11 +127,8 @@ defmodule Jido.Shell.StreamJson do
 
   defp collect_stream_output(
          session_id,
-         deadline_ms,
-         heartbeat_interval_ms,
-         on_event,
-         on_raw_line,
-         on_heartbeat,
+         {deadline_ms, heartbeat_interval_ms},
+         {on_event, on_raw_line, on_heartbeat},
          line_buffer,
          output_acc,
          event_acc,
@@ -155,11 +145,8 @@ defmodule Jido.Shell.StreamJson do
         {:jido_shell_session, ^session_id, {:command_started, _line}} ->
           collect_stream_output(
             session_id,
-            deadline_ms,
-            heartbeat_interval_ms,
-            on_event,
-            on_raw_line,
-            on_heartbeat,
+            {deadline_ms, heartbeat_interval_ms},
+            {on_event, on_raw_line, on_heartbeat},
             line_buffer,
             output_acc,
             event_acc,
@@ -173,11 +160,8 @@ defmodule Jido.Shell.StreamJson do
 
           collect_stream_output(
             session_id,
-            deadline_ms,
-            heartbeat_interval_ms,
-            on_event,
-            on_raw_line,
-            on_heartbeat,
+            {deadline_ms, heartbeat_interval_ms},
+            {on_event, on_raw_line, on_heartbeat},
             next_buffer,
             [chunk | output_acc],
             Enum.reverse(parsed_events) ++ event_acc,
@@ -188,11 +172,8 @@ defmodule Jido.Shell.StreamJson do
         {:jido_shell_session, ^session_id, {:output_stderr, chunk}} ->
           collect_stream_output(
             session_id,
-            deadline_ms,
-            heartbeat_interval_ms,
-            on_event,
-            on_raw_line,
-            on_heartbeat,
+            {deadline_ms, heartbeat_interval_ms},
+            {on_event, on_raw_line, on_heartbeat},
             line_buffer,
             [chunk | output_acc],
             event_acc,
@@ -203,11 +184,8 @@ defmodule Jido.Shell.StreamJson do
         {:jido_shell_session, ^session_id, {:cwd_changed, _}} ->
           collect_stream_output(
             session_id,
-            deadline_ms,
-            heartbeat_interval_ms,
-            on_event,
-            on_raw_line,
-            on_heartbeat,
+            {deadline_ms, heartbeat_interval_ms},
+            {on_event, on_raw_line, on_heartbeat},
             line_buffer,
             output_acc,
             event_acc,
@@ -234,11 +212,8 @@ defmodule Jido.Shell.StreamJson do
         {:jido_shell_session, ^session_id, _event} when not started? ->
           collect_stream_output(
             session_id,
-            deadline_ms,
-            heartbeat_interval_ms,
-            on_event,
-            on_raw_line,
-            on_heartbeat,
+            {deadline_ms, heartbeat_interval_ms},
+            {on_event, on_raw_line, on_heartbeat},
             line_buffer,
             output_acc,
             event_acc,
@@ -255,11 +230,8 @@ defmodule Jido.Shell.StreamJson do
 
           collect_stream_output(
             session_id,
-            deadline_ms,
-            heartbeat_interval_ms,
-            on_event,
-            on_raw_line,
-            on_heartbeat,
+            {deadline_ms, heartbeat_interval_ms},
+            {on_event, on_raw_line, on_heartbeat},
             line_buffer,
             output_acc,
             event_acc,
@@ -341,15 +313,13 @@ defmodule Jido.Shell.StreamJson do
   defp parse_stream_line(line) do
     trimmed = String.trim(line)
 
-    cond do
-      trimmed == "" ->
-        :empty
-
-      true ->
-        case Jason.decode(trimmed) do
-          {:ok, event} when is_map(event) -> {:event, event}
-          _ -> {:raw, trimmed}
-        end
+    if trimmed == "" do
+      :empty
+    else
+      case Jason.decode(trimmed) do
+        {:ok, event} when is_map(event) -> {:event, event}
+        _ -> {:raw, trimmed}
+      end
     end
   end
 

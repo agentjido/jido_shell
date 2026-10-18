@@ -79,7 +79,7 @@ defmodule Jido.Shell.ShellSessionServer do
   @doc """
   Cancels the currently running command.
   """
-  @spec cancel(String.t()) :: {:ok, :cancelled} | {:error, Error.t()}
+  @spec cancel(String.t() | pid()) :: {:ok, :cancelled} | {:error, Error.t()}
   def cancel(session_id) do
     with_session(session_id, fn pid ->
       GenServer.call(pid, :cancel)

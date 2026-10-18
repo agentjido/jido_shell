@@ -3,7 +3,7 @@ defmodule Jido.Shell.TestShellTest do
 
   alias Jido.Shell.TestShell
 
-  defp missing_shell() do
+  defp missing_shell do
     %TestShell{
       session_id: "missing-session",
       workspace_id: "missing-workspace",
