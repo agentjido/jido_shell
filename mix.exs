@@ -81,7 +81,7 @@ defmodule Jido.Shell.MixProject do
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.18.11"},
-      {:jido_vfs, "~> 1.0"},
+      {:jido_vfs, path: "../jido_vfs", override: true},
       {:bash, "~> 0.6.0", optional: true},
       {:lua, "~> 1.0.0-rc.1"},
 
