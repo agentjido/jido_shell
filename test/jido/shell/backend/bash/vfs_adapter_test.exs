@@ -21,6 +21,35 @@ defmodule Jido.Shell.Backend.Bash.VfsAdapterTest do
   end
 
   describe "write/4 and read/2" do
+    test "append creates a missing file", %{config: cfg} do
+      assert :ok = VfsAdapter.write(cfg, "/new.txt", "first", append: true)
+      assert {:ok, "first"} = VfsAdapter.read(cfg, "/new.txt")
+    end
+
+    test "unmounted workspaces return filesystem errors without retaining write buffers" do
+      cfg = %{workspace_id: "unmounted-#{System.unique_integer([:positive])}"}
+      assert {:error, :eacces} = VfsAdapter.write(cfg, "/file", "bytes", [])
+      assert {:error, :eacces} = VfsAdapter.mkdir_p(cfg, "/dir")
+      assert {:error, :enoent} = VfsAdapter.rm(cfg, "/file")
+      assert {:error, :enoent} = VfsAdapter.ls(cfg, "/")
+      assert [] = VfsAdapter.wildcard(cfg, "/*.txt", [])
+      assert {:error, :enoent} = VfsAdapter.open(cfg, "/file", [:read])
+      assert {:error, :einval} = VfsAdapter.open(cfg, "/file", [:unknown])
+      assert {:error, :einval} = VfsAdapter.open(cfg, "/file", :invalid)
+      {:ok, device} = VfsAdapter.open(cfg, "/file", [:append])
+      assert :ok = VfsAdapter.handle_write(cfg, device, "bytes")
+      assert {:error, :eacces} = VfsAdapter.handle_close(cfg, device)
+      assert Process.get({VfsAdapter, device}) == nil
+      refute Process.alive?(device)
+    end
+
+    test "unregistered devices receive writes directly", %{config: cfg} do
+      {:ok, device} = StringIO.open("")
+      assert :ok = VfsAdapter.handle_write(cfg, device, "bytes")
+      assert {"", "bytes"} = StringIO.contents(device)
+      assert :ok = VfsAdapter.handle_close(cfg, device)
+    end
+
     test "round-trips content", %{config: cfg} do
       assert :ok = VfsAdapter.write(cfg, "/hello.txt", "hi", [])
       assert {:ok, "hi"} = VfsAdapter.read(cfg, "/hello.txt")
