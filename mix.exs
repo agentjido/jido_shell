@@ -79,7 +79,7 @@ defmodule Jido.Shell.MixProject do
       # Runtime dependencies
       {:jason, "~> 1.4"},
       {:uniq, "~> 0.6"},
-      {:zoi, "~> 0.18.11"},
+      {:zoi, "~> 0.19.0"},
       vfs_dep(),
       {:bash, "~> 0.6.0", optional: true},
       {:lua, "~> 1.0.0-rc.1"},
