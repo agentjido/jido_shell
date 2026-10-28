@@ -97,7 +97,7 @@ defmodule Jido.Shell.Backend.SSH.KeyCallback do
       {:ECPrivateKey, :"ssh-ed25519"} -> ed25519_curve?(key)
       {:ECPrivateKey, :"ssh-ed448"} -> ed448_curve?(key)
       # OTP may also use these representations
-      _ when algorithm in [:"ssh-ed25519", :"ssh-ed448"] -> is_ed_key_tuple?(key)
+      _ when algorithm in [:"ssh-ed25519", :"ssh-ed448"] -> ed_key_tuple?(key)
       _ -> false
     end
   end
@@ -114,8 +114,8 @@ defmodule Jido.Shell.Backend.SSH.KeyCallback do
   defp ed448_curve?({:ECPrivateKey, _, _, {:namedCurve, {1, 3, 101, 113}}, _}), do: true
   defp ed448_curve?(_), do: false
 
-  defp is_ed_key_tuple?({:ed_pri, _, _, _}), do: true
-  defp is_ed_key_tuple?(_), do: false
+  defp ed_key_tuple?({:ed_pri, _, _, _}), do: true
+  defp ed_key_tuple?(_), do: false
 
   defp get_key_from_opts(opts) do
     case opts[:key_cb_private] do

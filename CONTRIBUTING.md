@@ -26,12 +26,22 @@ mix coveralls
 `mix quality` runs `mix jido_shell.guardrails`, so namespace/layout regressions fail early in scripted workflows.
 See [GUARDRAILS.md](GUARDRAILS.md) for extension guidance.
 
+`mix coveralls` fails if application source coverage is below 90%. All source
+under `lib/` is included. Test support code is excluded from the calculation.
+`mix coveralls.json` writes `cover/excoveralls.json`, but does not enforce the
+minimum. Use the local reporter for the coverage check.
+
+The default suite excludes tests tagged `:flaky`, `:sprites`, or
+`:ssh_integration`. The Sprite backend unit tests use controlled client
+responses. Lua tests run the local Lua VM. Read the excluded test counts with
+the coverage report; this result does not establish live service coverage.
+
 ## Common Commands
 
 ```bash
 mix format --check-formatted
 mix compile --warnings-as-errors
-mix credo --min-priority higher
+mix credo --strict
 mix dialyzer
 mix docs
 ```

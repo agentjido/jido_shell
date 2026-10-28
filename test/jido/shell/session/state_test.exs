@@ -54,7 +54,7 @@ defmodule Jido.Shell.ShellSession.StateTest do
 
     test "rejects invalid workspace_id type" do
       assert {:error, errors} = State.new(%{id: "s", workspace_id: :not_a_string})
-      assert length(errors) > 0
+      assert errors != []
     end
   end
 

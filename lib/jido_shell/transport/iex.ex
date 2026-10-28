@@ -42,7 +42,7 @@ defmodule Jido.Shell.Transport.IEx do
          {:ok, :subscribed} <- ShellSessionServer.subscribe(session_id, self()),
          {:ok, initial_state} <- ShellSessionServer.get_state(session_id) do
       IO.puts("Jido.Shell v#{Jido.Shell.version()}")
-      IO.puts("Type \"exit\" to quit, \"help\" for commands.\n")
+      IO.puts(~s(Type "exit" to quit, "help" for commands.\n))
 
       loop(session_id, initial_state.cwd, opts)
     end

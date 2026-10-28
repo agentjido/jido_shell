@@ -47,9 +47,7 @@ defmodule Jido.Shell.Guardrails do
       "Jido.Shell guardrails failed: detected namespace/layout regressions that violate the package convention."
 
     details =
-      violations
-      |> Enum.map(&format_violation/1)
-      |> Enum.join("\n")
+      Enum.map_join(violations, "\n", &format_violation/1)
 
     [header, details]
     |> Enum.reject(&(&1 == ""))

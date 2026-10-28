@@ -5,10 +5,10 @@ defmodule Jido.Shell.Transport.IExTest do
 
   alias Jido.Shell.Error
   alias Jido.Shell.ShellSession
-  alias Jido.Shell.Transport.IEx
   alias Jido.Shell.ShellSessionServer
+  alias Jido.Shell.Transport.IEx
 
-  defp start_session!() do
+  defp start_session! do
     workspace_id = "test_ws_#{System.unique_integer([:positive])}"
     {:ok, session_id} = ShellSession.start_with_vfs(workspace_id)
 

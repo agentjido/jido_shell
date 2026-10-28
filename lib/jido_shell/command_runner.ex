@@ -3,9 +3,9 @@ defmodule Jido.Shell.CommandRunner do
   Executes commands in Task processes and streams output back.
   """
 
-  alias Jido.Shell.Error
   alias Jido.Shell.Command.Parser
   alias Jido.Shell.Command.Registry
+  alias Jido.Shell.Error
   alias Jido.Shell.ShellSession.State
 
   @output_bytes_key :jido_shell_command_output_bytes

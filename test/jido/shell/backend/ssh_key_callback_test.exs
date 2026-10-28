@@ -74,7 +74,7 @@ defmodule Jido.Shell.Backend.SSHKeyCallbackTest do
   end
 
   defp ecdsa_private_key_pem do
-    key = :public_key.generate_key({:namedCurve, {1, 2, 840, 10045, 3, 1, 7}})
+    key = :public_key.generate_key({:namedCurve, {1, 2, 840, 10_045, 3, 1, 7}})
     :public_key.pem_encode([:public_key.pem_entry_encode(:ECPrivateKey, key)])
   end
 end

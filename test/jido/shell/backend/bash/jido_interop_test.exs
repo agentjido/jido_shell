@@ -42,6 +42,17 @@ defmodule Jido.Shell.Backend.Bash.JidoInteropTest do
   end
 
   describe "echo" do
+    test "direct dispatch refuses a missing workspace and converts numeric arguments", %{workspace_id: wid} do
+      assert {:error, "jido.echo: workspace not configured\n"} = JidoInterop.dispatch("echo", [], %{})
+      assert {:ok, "123\n"} = JidoInterop.dispatch("echo", [123], %{variables: %{"JIDO_WORKSPACE_ID" => wid}})
+    end
+
+    test "environment changes remain visible to later Bash and Jido commands", %{session: session} do
+      assert {0, _, _} = run!(session, "jido.env MODE=changed")
+      assert {0, "MODE=changed\n", _} = run!(session, "jido.env MODE")
+      assert {0, "changed\n", _} = run!(session, "echo $MODE")
+    end
+
     test "writes to stdout", %{session: session} do
       {0, stdout, _} = run!(session, "jido.echo hello world")
       assert stdout == "hello world\n"

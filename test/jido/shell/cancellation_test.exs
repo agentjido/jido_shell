@@ -15,13 +15,14 @@ defmodule Jido.Shell.CancellationTest do
   end
 
   describe "cancel/1" do
-    test "cancels running command", %{session_id: session_id} do
+    test "cancels running command through its PID", %{session_id: session_id} do
       {:ok, :accepted} = ShellSessionServer.run_command(session_id, "sleep 10")
 
       assert_receive {:jido_shell_session, _, {:command_started, "sleep 10"}}, @event_timeout
       assert_receive {:jido_shell_session, _, {:output, "Sleeping for 10 seconds...\n"}}, @event_timeout
 
-      {:ok, :cancelled} = ShellSessionServer.cancel(session_id)
+      {:ok, pid} = ShellSession.lookup(session_id)
+      {:ok, :cancelled} = ShellSessionServer.cancel(pid)
 
       assert_receive {:jido_shell_session, _, :command_cancelled}, @event_timeout
 

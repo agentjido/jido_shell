@@ -83,4 +83,28 @@ defmodule Jido.Shell.Backend.Lua.JidoApiTest do
     assert [{:output_stderr, stderr}] = collect_events(ref)
     assert stderr =~ "not_found"
   end
+
+  test "file commands and environment updates use the same virtual workspace", %{workspace_id: wid} do
+    {lua, ref} = lua_with_context(wid)
+
+    {_result, lua} =
+      Lua.eval!(
+        lua,
+        ~S|jido.mkdir("/work"); jido.write("/work/source", "bytes"); jido.cp("/work/source", "/work/copy"); jido.ls("/work"); jido.env("MODE=test"); jido.env("MODE"); jido.sleep("0"); jido.seq("1", "2"); jido.rm("/work/source")|
+      )
+
+    assert {:ok, "bytes"} = VFS.read_file(wid, "/work/copy")
+    refute VFS.exists?(wid, "/work/source")
+    assert {:ok, %{env: %{"MODE" => "test"}}} = Lua.get_private(lua, JidoApi.context_key())
+    events = collect_events(ref)
+    assert {:output, "MODE=test\n"} in events
+    assert Enum.any?(events, fn {_, output} -> String.contains?(output, "copy") end)
+  end
+
+  test "print converts Lua values and a missing evaluation context is refused", %{workspace_id: wid} do
+    {lua, ref} = lua_with_context(wid)
+    Lua.eval!(lua, ~S|print(nil, 12, 1.5, true, false)|)
+    assert [{:output, "\t12\t1.5\ttrue\tfalse\n"}] = collect_events(ref)
+    assert_raise Lua.RuntimeException, ~r/missing Jido eval context/, fn -> JidoApi.print([], Lua.new()) end
+  end
 end

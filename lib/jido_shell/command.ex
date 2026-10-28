@@ -36,7 +36,7 @@ defmodule Jido.Shell.Command do
   @type emit :: (event :: term() -> :ok)
   @type run_result :: {:ok, term()} | {:error, Jido.Shell.Error.t()}
 
-  @doc "Returns the command name (e.g., \"echo\", \"ls\", \"cd\")"
+  @doc ~s|Returns the command name (e.g., "echo", "ls", "cd")|
   @callback name() :: String.t()
 
   @doc "Returns a short summary of the command"

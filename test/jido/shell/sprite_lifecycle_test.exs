@@ -175,6 +175,60 @@ defmodule Jido.Shell.Environment.SpriteTest do
     refute_receive {:destroy_called, _}, 20
   end
 
+  test "teardown accepts the supported not-found response formats" do
+    for reason <- [
+          {:http_error, 404, "missing"},
+          {:error, %{status: 404}},
+          {:not_found, "name"},
+          "NOT FOUND",
+          {:status_code, 404}
+        ] do
+      Process.put({:sprites_get_script, FakeSpritesMod}, [{:error, reason}])
+
+      assert %{teardown_verified: true, warnings: nil} =
+               Sprite.teardown("absent",
+                 sprite_name: "name",
+                 stop_mod: FakeAgentMod,
+                 sprite_config: %{token: "token", base_url: "https://example.test"},
+                 sprites_mod: FakeSpritesMod,
+                 retry_backoffs_ms: [1]
+               )
+
+      assert_receive {:sprites_new, "token", [base_url: "https://example.test"]}
+      refute_received {:destroy_called, _}
+    end
+  end
+
+  test "teardown retains verification errors after an unexpected destroy response" do
+    Process.put({:sprites_get_script, FakeSpritesMod}, [{:ok, %{}}, {:error, :offline}])
+    Process.put({:sprites_destroy_script, FakeSpritesMod}, [:unexpected])
+
+    result =
+      Sprite.teardown("failed",
+        sprite_name: "name",
+        stop_mod: FakeAgentMod,
+        sprite_config: %{token: "token"},
+        sprites_mod: FakeSpritesMod,
+        retry_backoffs_ms: [0]
+      )
+
+    refute result.teardown_verified
+    assert_warning_contains(result.warnings, "unexpected_destroy_result")
+    assert_warning_contains(result.warnings, "sprite_verification_failed=:offline")
+  end
+
+  test "an empty sprite name cannot be verified and a missing stop API is handled" do
+    result =
+      Sprite.teardown("missing-session-#{System.unique_integer([:positive])}",
+        sprite_name: "",
+        stop_mod: MissingStopModule,
+        retry_backoffs_ms: [0]
+      )
+
+    refute result.teardown_verified
+    assert_warning_contains(result.warnings, "missing_sprite_name")
+  end
+
   test "teardown/2 destroys present sprites and verifies removal" do
     Process.put(:sprite_agent_stop_result, :ok)
 

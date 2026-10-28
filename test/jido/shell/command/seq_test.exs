@@ -1,8 +1,8 @@
 defmodule Jido.Shell.Command.SeqTest do
   use Jido.Shell.Case, async: true
 
-  alias Jido.Shell.ShellSession.State
   alias Jido.Shell.Command.Seq
+  alias Jido.Shell.ShellSession.State
 
   setup do
     {:ok, state} = State.new(%{id: "test", workspace_id: "test"})
