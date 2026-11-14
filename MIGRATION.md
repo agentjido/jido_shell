@@ -163,3 +163,19 @@ After (canonical):
 {:ok, result} = Jido.Shell.Environment.Sprite.provision(workspace_id, sprite_config)
 teardown = Jido.Shell.Environment.Sprite.teardown(session_id, sprite_name: workspace_id)
 ```
+
+## Consolidated Jido v3 compatibility
+
+Shell keeps its standalone runtime. `Jido.Shell.Agent` is a synchronous session
+API; it is not a `Jido.Agent` implementation. Hosts own Action wrappers and
+Signal routing. Use consolidated `jido` for both modules.
+
+The public session contract keeps string session IDs, tuple results, and
+`{:jido_shell_session, session_id, event}` notifications. A host must stop each
+session when its owner is done. Workspace uses this same Shell API and the VFS
+adapter contract. No core dependency is required in the Shell runtime.
+
+The package tests check session events and file operations. The Workspace v3
+boundary suite also checks file writes, shell reads, policy refusal, immutable
+captures, and core Action/Signal calls in one graph. See the package result
+record at `docs/plans/2026-11-14-v3-compatibility-result.md` for commands and limits.
