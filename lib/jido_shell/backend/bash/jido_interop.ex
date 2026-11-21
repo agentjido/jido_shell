@@ -16,9 +16,7 @@ if Code.ensure_loaded?(Bash.Interop) do
     and the bridge forwards that via `Bash.update_state/1` so subsequent bash
     builtins (and the outer backend) see the new cwd.
 
-    Workspace id is taken from the bash session state under the
-    `:jido_workspace_id` variable, which `Jido.Shell.Backend.Bash` sets during
-    initialisation.
+    The Bash backend sets the mount identity when it starts the session.
 
     ## Security — interop trust boundary
 

@@ -100,10 +100,9 @@ defmodule Jido.Shell.MixProject do
   end
 
   defp vfs_dep do
-    if File.regular?(Path.expand("../jido_vfs/mix.exs", __DIR__)) do
-      {:jido_vfs, path: "../jido_vfs", override: true}
-    else
-      {:jido_vfs, "~> 1.0"}
+    case System.get_env("JIDO_VFS_PATH") do
+      nil -> {:jido_vfs, "~> 1.0"}
+      path -> {:jido_vfs, path: Path.expand(path)}
     end
   end
 
