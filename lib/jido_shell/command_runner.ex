@@ -37,6 +37,11 @@ defmodule Jido.Shell.CommandRunner do
     end
   end
 
+  @doc "Runs one command with literal arguments and without shell parsing."
+  @spec execute_argv(State.t(), [String.t(), ...], Jido.Shell.Command.emit()) ::
+          Jido.Shell.Command.run_result()
+  def execute_argv(state, [command | args], emit), do: execute_command(state, command, args, emit)
+
   defp parse_program(line) do
     case Parser.parse_program(line) do
       {:ok, _} = ok ->

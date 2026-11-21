@@ -90,6 +90,14 @@ defmodule Jido.Shell.CommandRunnerTest do
     end
   end
 
+  test "execute_argv treats shell operators as argument text", %{state: state} do
+    emit = fn event -> send(self(), {:emit, event}) end
+
+    assert {:ok, nil} = CommandRunner.execute_argv(state, ["echo", "a && echo b"], emit)
+    assert_receive {:emit, {:output, "a && echo b\n"}}
+    refute_received {:emit, {:output, _}}
+  end
+
   describe "run/4" do
     test "sends events to session pid", %{state: state} do
       session_pid = self()
