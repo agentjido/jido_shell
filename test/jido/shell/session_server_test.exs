@@ -6,6 +6,41 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
   @event_timeout 1_000
 
+  defmodule RejectCancelBackend do
+    @behaviour Jido.Shell.Backend
+
+    alias Jido.Shell.Backend.Local
+
+    @impl true
+    defdelegate init(config), to: Local
+
+    @impl true
+    defdelegate terminate(state), to: Local
+
+    @impl true
+    defdelegate cwd(state), to: Local
+
+    @impl true
+    defdelegate cd(state, path), to: Local
+
+    @impl true
+    def execute(state, "wait_for_exit", [], _opts) do
+      {:ok, worker} =
+        Task.Supervisor.start_child(state.task_supervisor, fn ->
+          receive do
+            :exit -> exit(:worker_failed)
+          end
+        end)
+
+      {:ok, worker, state}
+    end
+
+    def execute(state, command, args, opts), do: Local.execute(state, command, args, opts)
+
+    @impl true
+    def cancel(_state, _ref), do: {:error, :cancel_rejected}
+  end
+
   describe "start_link/1" do
     test "starts a session server" do
       session_id = ShellSession.generate_id()
@@ -231,6 +266,38 @@ defmodule Jido.Shell.ShellSessionServerTest do
 
       {:ok, state} = ShellSessionServer.get_state(session_id)
       assert state.current_command == nil
+    end
+  end
+
+  describe "cancel/1" do
+    @tag capture_log: true
+    test "clears the command on worker exit after the backend rejects cancellation" do
+      session_id = ShellSession.generate_id()
+      task_supervisor = start_supervised!(Task.Supervisor)
+
+      {:ok, _pid} =
+        ShellSessionServer.start_link(
+          session_id: session_id,
+          workspace_id: "test",
+          backend: {RejectCancelBackend, %{task_supervisor: task_supervisor}}
+        )
+
+      assert {:ok, :subscribed} = ShellSessionServer.subscribe(session_id, self())
+      assert {:ok, :accepted} = ShellSessionServer.run_command(session_id, "wait_for_exit")
+      assert {:ok, %{current_command: %{task: worker}}} = ShellSessionServer.get_state(session_id)
+
+      assert {:error, %Jido.Shell.Error{code: {:command, :cancel_failed}, context: %{reason: :cancel_rejected}}} =
+               ShellSessionServer.cancel(session_id)
+
+      assert {:ok, %{current_command: %{task: ^worker}}} = ShellSessionServer.get_state(session_id)
+
+      send(worker, :exit)
+      assert_receive {:jido_shell_session, ^session_id, {:command_crashed, :worker_failed}}, @event_timeout
+      assert {:ok, %{current_command: nil}} = ShellSessionServer.get_state(session_id)
+
+      assert {:ok, :accepted} = ShellSessionServer.run_command(session_id, "echo retry")
+      assert_receive {:jido_shell_session, ^session_id, {:output, "retry\n"}}, @event_timeout
+      assert_receive {:jido_shell_session, ^session_id, :command_done}, @event_timeout
     end
   end
 
