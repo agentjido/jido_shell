@@ -357,8 +357,6 @@ defmodule Jido.Shell.ShellSessionServer do
         {{:error, error}, state}
 
       command ->
-        maybe_demonitor(command.ref)
-
         command_ref =
           case Map.get(command, :backend_ref) do
             nil -> command.task
@@ -367,6 +365,7 @@ defmodule Jido.Shell.ShellSessionServer do
 
         case safe_backend_cancel(state.backend, state.backend_state, command_ref) do
           :ok ->
+            maybe_demonitor(command.ref)
             broadcast(state, :command_cancelled)
             {{:ok, :cancelled}, State.clear_current_command(state)}
 
